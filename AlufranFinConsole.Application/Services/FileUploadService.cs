@@ -6,7 +6,7 @@ namespace AlufranFinConsole.Application.Services;
 
 public interface IFileUploadService
 {
-    Task<ImportFile> UploadFileAsync(Stream fileStream, string fileName, string fileType, string competence, int userId);
+    Task<ImportFile> UploadFileAsync(Stream fileStream, string fileName, string fileType, string competence, string userId);
     string GenerateFileHash(Stream stream);
     bool ValidateFileType(string fileType);
 }
@@ -22,7 +22,7 @@ public class FileUploadService : IFileUploadService
         Directory.CreateDirectory(_storagePath);
     }
 
-    public async Task<ImportFile> UploadFileAsync(Stream fileStream, string fileName, string fileType, string competence, int userId)
+    public async Task<ImportFile> UploadFileAsync(Stream fileStream, string fileName, string fileType, string competence, string userId)
     {
         if (!ValidateFileType(fileType))
             throw new ArgumentException($"File type '{fileType}' is not supported");

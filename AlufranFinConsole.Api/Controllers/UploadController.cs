@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using AlufranFinConsole.Application.Services;
 using AlufranFinConsole.Infrastructure.Persistence;
 using AlufranFinConsole.Domain.Entities;

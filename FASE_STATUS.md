@@ -1,23 +1,24 @@
-# 🚀 Console Financeiro Alufran — Status Fase 2 Completa
+# 🚀 Console Financeiro Alufran — Status Fase 3 (Upload & Versionamento)
 
-**Data:** 2026-05-07  
-**Tempo Total:** ~2 horas  
-**Stack:** .NET 8 + Blazor + SQLite (100% gratuito, zero config)
+**Data:** 2026-05-08  
+**Stack:** .NET 8 + ASP.NET Core API + JWT + SQLite + Render (Free Tier)
 
 ---
 
-## ✅ FASE 1: FUNDAÇÃO — COMPLETA (6/6)
+## ✅ FASE 1: FUNDAÇÃO & AUTENTICAÇÃO JWT — COMPLETA (8/8)
 
 | Tarefa | Status | Details |
 |--------|--------|---------|
 | 1.1 Solução & Projetos | ✅ FEITO | 6 projetos (Domain, Application, Infrastructure, Api, Web, Tests) |
-| 1.2 SQLite & EF Core | ✅ FEITO | Entity Framework Core SQLite 8.0.0 instalado |
-| 1.3 Autenticação | ✅ FEITO | User entity + Session configuradas |
-| 1.4 Storage | ✅ FEITO | Pasta local com StoragePath |
+| 1.2 SQLite & EF Core | ✅ FEITO | Entity Framework Core + SQLite |
+| 1.3 Autenticação JWT | ✅ FEITO | JWT Bearer tokens + IdentityUser + AuthController |
+| 1.4 Storage | ✅ FEITO | Pasta local com StoragePath para SQLite |
 | 1.5 Entidades Núcleo | ✅ FEITO | User, ImportFile + migrations |
-| 1.6 Documentação | ✅ FEITO | README.md + setup_db.sql |
+| 1.6 Docker & Deploy | ✅ FEITO | Dockerfile + Render deployment |
+| 1.7 Produção | ✅ FEITO | API rodando em https://alufranfinconsole.onrender.com |
+| 1.8 Admin User | ✅ FEITO | Auto-seed: admin@alufran.local / AlufranAdmin@2026 |
 
-**Resultado:** Solução **compilada com 0 erros**, pronta para rodar
+**Resultado:** API em produção ✅ JWT autenticado ✅ Pronto para Phase 3
 
 ---
 
@@ -134,11 +135,37 @@ Web (Blazor Server)
 
 ---
 
-## 📈 Próximos Passos (Fase 3-9)
+## 🔄 PHASE 3: UPLOAD & VERSIONAMENTO — EM PROGRESSO
+
+### Objetivos Phase 3:
+- ✅ Criar endpoint POST `/api/upload` para arquivos financeiros
+- ✅ Suportar 7 tipos: PAG, REC, FAT, EMITIDAS, COMP, TRANSF, FOPAG
+- ✅ Versionamento com hash MD5 para integridade
+- ✅ Armazenar em `/var/data/uploads/` (persistente no Render)
+- ✅ Validação de formato e estrutura
+- ✅ Status tracking (PENDING, PROCESSING, COMPLETED, FAILED)
+
+### Implementação:
+```
+API/Controllers/
+├── UploadController.cs (melhorar)
+    ├── POST /api/upload
+    ├── GET /api/uploads/{id}
+    └── GET /api/uploads/history
+    
+Application/Services/
+├── FileUploadService.cs (expandir)
+    ├── ValidateFile()
+    ├── ComputeHash()
+    ├── StoreFile()
+    └── CreateImportFile()
+```
+
+## 📈 Roadmap Completo (Fase 3-9)
 
 | Fase | Objetivo | Status |
 |------|----------|--------|
-| 3 | Upload & Versionamento | ⏳ PRÓXIMO |
+| 3 | Upload & Versionamento | 🔄 AGORA |
 | 4 | Staging & Saneamento | ⏳ |
 | 5 | Classificação & QA | ⏳ |
 | 6 | Consolidado Financeiro | ⏳ |

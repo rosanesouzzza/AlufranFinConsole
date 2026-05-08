@@ -96,7 +96,7 @@ using (var scope = app.Services.CreateScope())
     if (!userManager.Users.Any())
     {
         var admin = new Microsoft.AspNetCore.Identity.IdentityUser { UserName = "admin@alufran.local", Email = "admin@alufran.local" };
-        await userManager.CreateAsync(admin, "AlufranAdmin@2026");
+        userManager.CreateAsync(admin, "AlufranAdmin@2026").GetAwaiter().GetResult();
     }
 }
 

@@ -62,11 +62,12 @@ public class AuthController : ControllerBase
             new Claim(ClaimTypes.Name, user.UserName)
         };
 
+        var expireMinutes = int.TryParse(jwtSettings["ExpireMinutes"], out var mins) ? mins : 480;
         var token = new JwtSecurityToken(
             issuer: jwtSettings["Issuer"],
             audience: jwtSettings["Audience"],
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(int.Parse(jwtSettings["ExpireMinutes"])),
+            expires: DateTime.UtcNow.AddMinutes(expireMinutes),
             signingCredentials: creds
         );
 

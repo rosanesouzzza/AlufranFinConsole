@@ -36,11 +36,13 @@ public class AuthController : ControllerBase
         return Ok(new { token, userId = user.Id, email = user.Email });
     }
 
-    /// <summary>Temporary: shows JWT config and validates token from Authorization header. Remove after debugging.</summary>
+    /// <summary>Temporary: shows JWT config, all received headers and validates token. Remove after debugging.</summary>
     [HttpGet("debug")]
     [AllowAnonymous]
     public IActionResult Debug()
     {
+        const string version = "v3-xauth";
+
         var jwtSettings = _configuration.GetSection("Jwt");
         var keyValue = jwtSettings["Key"] ?? "(null)";
         var config = new
@@ -56,7 +58,23 @@ public class AuthController : ControllerBase
                 : "(not set)"
         };
 
-        // Try to validate the token from the Authorization header directly
+        // Show ALL incoming headers so we can see what Cloudflare/Render passes through
+        var receivedHeaders = Request.Headers
+            .Where(h => !h.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase))
+            .Select(h => new
+            {
+                name = h.Key,
+                count = h.Value.Count,
+                values = h.Value.Select((v, i) => new
+                {
+                    i,
+                    len = v?.Length ?? 0,
+                    dots = v?.Count(c => c == '.') ?? 0,
+                    val = (v?.Length ?? 0) > 120 ? v![..120] + "…" : v
+                })
+            });
+
+        // Try to validate the token from Authorization header directly
         var authHeader = Request.Headers["Authorization"].FirstOrDefault();
         if (authHeader != null && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
@@ -78,24 +96,47 @@ public class AuthController : ControllerBase
                 };
                 handler.ValidateToken(token, validParams, out var validated);
                 var claims = (validated as JwtSecurityToken)?.Claims.Select(c => new { c.Type, c.Value });
-                return Ok(new { config, tokenPresent = true, tokenValid = true, claims });
+                return Ok(new { version, config, tokenPresent = true, tokenValid = true, claims, receivedHeaders });
             }
             catch (Exception ex)
             {
-                return Ok(new { config, tokenPresent = true, tokenValid = false, error = ex.Message });
+                return Ok(new { version, config, tokenPresent = true, tokenValid = false, error = ex.Message, receivedHeaders });
             }
         }
 
-        // Diagnostic: show raw Authorization values so we can inspect proxy injection
-        var rawAuthValues = Request.Headers["Authorization"].ToArray();
-        var authDiag = rawAuthValues.Select((v, i) => new
+        // Also try X-Auth-Token directly
+        var xAuthToken = Request.Headers["X-Auth-Token"].FirstOrDefault();
+        string? xAuthResult = null;
+        if (!string.IsNullOrWhiteSpace(xAuthToken))
         {
-            index = i,
-            length = v?.Length ?? 0,
-            dotCount = v?.Count(c => c == '.') ?? 0,
-            first80 = (v?.Length ?? 0) > 80 ? v![..80] + "…" : v
-        });
-        return Ok(new { config, tokenPresent = false, hint = "Pass Authorization: Bearer <token> header to validate", authDiag });
+            var rawTok = xAuthToken.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                ? xAuthToken["Bearer ".Length..].Trim()
+                : xAuthToken.Trim();
+            try
+            {
+                var handler = new JwtSecurityTokenHandler();
+                var keyBytes = Encoding.ASCII.GetBytes(keyValue);
+                var validParams = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+                    ValidateIssuer = true,
+                    ValidIssuer = jwtSettings["Issuer"],
+                    ValidateAudience = true,
+                    ValidAudience = jwtSettings["Audience"],
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.FromMinutes(5)
+                };
+                handler.ValidateToken(rawTok, validParams, out _);
+                xAuthResult = "VALID";
+            }
+            catch (Exception ex)
+            {
+                xAuthResult = "INVALID: " + ex.Message;
+            }
+        }
+
+        return Ok(new { version, config, tokenPresent = false, xAuthTokenPresent = !string.IsNullOrWhiteSpace(xAuthToken), xAuthResult, receivedHeaders });
     }
 
     [HttpPost("register")]

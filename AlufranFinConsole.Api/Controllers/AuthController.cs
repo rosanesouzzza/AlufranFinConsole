@@ -86,7 +86,16 @@ public class AuthController : ControllerBase
             }
         }
 
-        return Ok(new { config, tokenPresent = false, hint = "Pass Authorization: Bearer <token> header to validate" });
+        // Diagnostic: show raw Authorization values so we can inspect proxy injection
+        var rawAuthValues = Request.Headers["Authorization"].ToArray();
+        var authDiag = rawAuthValues.Select((v, i) => new
+        {
+            index = i,
+            length = v?.Length ?? 0,
+            dotCount = v?.Count(c => c == '.') ?? 0,
+            first80 = (v?.Length ?? 0) > 80 ? v![..80] + "…" : v
+        });
+        return Ok(new { config, tokenPresent = false, hint = "Pass Authorization: Bearer <token> header to validate", authDiag });
     }
 
     [HttpPost("register")]

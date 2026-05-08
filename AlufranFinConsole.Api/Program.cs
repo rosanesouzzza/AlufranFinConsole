@@ -53,26 +53,44 @@ builder.Services
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(5)
         };
-        // Events: pick the correct Bearer token when Cloudflare injects its own
-        // Authorization header before ours (the concatenated multi-value string
-        // breaks default extraction with "no dots" error).
+        // Events: pick OUR JWT when Cloudflare injects its own JWT in the same
+        // Authorization header (Cloudflare's token is valid JWS but has no exp/iss).
         options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
         {
             OnMessageReceived = context =>
             {
-                // Iterate every Authorization value and pick the first valid JWS token
-                // (exactly 2 dots = header.payload.signature).
-                foreach (var val in context.Request.Headers["Authorization"])
+                // Join ALL Authorization header values into one string so that both
+                // "two separate values" and "one comma-joined value" are handled.
+                var authHeaderStr = context.Request.Headers["Authorization"].ToString();
+
+                // Find every Bearer token that matches the JWS pattern eyJ<hdr>.<payload>.<sig>
+                var matches = System.Text.RegularExpressions.Regex.Matches(
+                    authHeaderStr,
+                    @"Bearer\s+(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                foreach (System.Text.RegularExpressions.Match m in matches)
                 {
-                    if (val is null) continue;
-                    var candidate = val.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-                        ? val["Bearer ".Length..].Trim()
-                        : val.Trim();
-                    if (candidate.Count(c => c == '.') == 2)
+                    var candidate = m.Groups[1].Value;
+                    var parts = candidate.Split('.');
+                    if (parts.Length != 3) continue;
+
+                    try
                     {
-                        context.Token = candidate;
-                        break;
+                        // Quick base64url-decode the payload to check the issuer.
+                        // Our tokens always carry iss:AlufranConsole; Cloudflare's don't.
+                        var padded = parts[1].Replace('-', '+').Replace('_', '/')
+                            .PadRight(parts[1].Length + (4 - parts[1].Length % 4) % 4, '=');
+                        var payloadJson = System.Text.Encoding.UTF8.GetString(
+                            Convert.FromBase64String(padded));
+
+                        if (payloadJson.Contains("\"iss\":\"AlufranConsole\""))
+                        {
+                            context.Token = candidate;
+                            return Task.CompletedTask;
+                        }
                     }
+                    catch { /* malformed token – skip */ }
                 }
                 return Task.CompletedTask;
             },

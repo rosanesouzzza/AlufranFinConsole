@@ -20,14 +20,17 @@ builder.Services.AddDbContext<AlufranFinConsole.Infrastructure.Persistence.Appli
     }
 });
 
+// AddIdentityCore does NOT register cookie auth as the default scheme,
+// so JWT Bearer can be the sole default authenticator for this API.
 builder.Services
-    .AddIdentity<Microsoft.AspNetCore.Identity.IdentityUser, Microsoft.AspNetCore.Identity.IdentityRole>(options =>
+    .AddIdentityCore<Microsoft.AspNetCore.Identity.IdentityUser>(options =>
     {
         options.Password.RequiredLength = 8;
         options.Password.RequireDigit = true;
         options.Password.RequireUppercase = true;
         options.SignIn.RequireConfirmedEmail = false;
     })
+    .AddRoles<Microsoft.AspNetCore.Identity.IdentityRole>()
     .AddEntityFrameworkStores<AlufranFinConsole.Infrastructure.Persistence.ApplicationDbContext>()
     .AddDefaultTokenProviders();
 
@@ -36,11 +39,7 @@ var secretKey = jwtSettings["Key"] ?? throw new InvalidOperationException("JWT K
 var key = System.Text.Encoding.ASCII.GetBytes(secretKey);
 
 builder.Services
-    .AddAuthentication(options =>
-    {
-        options.DefaultAuthenticateScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme;
-    })
+    .AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
@@ -52,7 +51,17 @@ builder.Services
             ValidateAudience = true,
             ValidAudience = jwtSettings["Audience"],
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
+            ClockSkew = TimeSpan.FromMinutes(5)
+        };
+        // Expose the exact validation error as a response header for diagnostics
+        options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                context.Response.Headers["X-Auth-Error"] =
+                    context.Exception.GetType().Name + ": " + context.Exception.Message[..Math.Min(200, context.Exception.Message.Length)];
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -79,7 +88,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// UseHttpsRedirection removed: Render terminates TLS at its proxy layer;
+// the internal connection is plain HTTP and a redirect here would strip the
+// Authorization header on any HTTPS→HTTP redirect cycle.
 app.UseRouting();
 app.UseCors("AllowAll");
 app.UseAuthentication();

@@ -36,14 +36,14 @@ public class AuthController : ControllerBase
         return Ok(new { token, userId = user.Id, email = user.Email });
     }
 
-    /// <summary>Temporary: shows JWT config and validates a token. Remove after debugging.</summary>
+    /// <summary>Temporary: shows JWT config and validates token from Authorization header. Remove after debugging.</summary>
     [HttpGet("debug")]
     [AllowAnonymous]
-    public IActionResult Debug([FromQuery] string? token = null)
+    public IActionResult Debug()
     {
         var jwtSettings = _configuration.GetSection("Jwt");
         var keyValue = jwtSettings["Key"] ?? "(null)";
-        var result = new
+        var config = new
         {
             issuer = jwtSettings["Issuer"],
             audience = jwtSettings["Audience"],
@@ -51,31 +51,42 @@ public class AuthController : ControllerBase
             keyLength = keyValue.Length,
             keyFirst8 = keyValue.Length >= 8 ? keyValue.Substring(0, 8) + "..." : keyValue,
             env = System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
-            jwtEnvKey = System.Environment.GetEnvironmentVariable("Jwt__Key")?.Substring(0, 8) + "..."
+            jwtEnvKey = System.Environment.GetEnvironmentVariable("Jwt__Key") is { } envKey && envKey.Length >= 8
+                ? envKey.Substring(0, 8) + "..."
+                : "(not set)"
         };
-        if (token != null)
+
+        // Try to validate the token from the Authorization header directly
+        var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+        if (authHeader != null && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
+            var token = authHeader.Substring("Bearer ".Length).Trim();
             try
             {
                 var handler = new JwtSecurityTokenHandler();
                 var keyBytes = Encoding.ASCII.GetBytes(keyValue);
                 var validParams = new TokenValidationParameters
                 {
+                    ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+                    ValidateIssuer = true,
                     ValidIssuer = jwtSettings["Issuer"],
+                    ValidateAudience = true,
                     ValidAudience = jwtSettings["Audience"],
                     ValidateLifetime = true,
-                    ClockSkew = TimeSpan.Zero
+                    ClockSkew = TimeSpan.FromMinutes(5)
                 };
                 handler.ValidateToken(token, validParams, out var validated);
-                return Ok(new { config = result, tokenValid = true, tokenClaims = (validated as JwtSecurityToken)?.Claims.Select(c => new { c.Type, c.Value }) });
+                var claims = (validated as JwtSecurityToken)?.Claims.Select(c => new { c.Type, c.Value });
+                return Ok(new { config, tokenPresent = true, tokenValid = true, claims });
             }
             catch (Exception ex)
             {
-                return Ok(new { config = result, tokenValid = false, error = ex.Message });
+                return Ok(new { config, tokenPresent = true, tokenValid = false, error = ex.Message });
             }
         }
-        return Ok(result);
+
+        return Ok(new { config, tokenPresent = false, hint = "Pass Authorization: Bearer <token> header to validate" });
     }
 
     [HttpPost("register")]

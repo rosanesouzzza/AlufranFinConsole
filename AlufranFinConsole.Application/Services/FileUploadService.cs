@@ -52,6 +52,7 @@ public class FileUploadService : IFileUploadService
             FileType = fileType,
             Competence = competence,
             Status = "UPLOADED",
+            FileSize = fileStream.Length,
             StoragePath = Path.GetRelativePath(_storagePath, storagePath),
             UploadedBy_Id = userId,
             CreatedAt = DateTime.UtcNow

@@ -85,6 +85,7 @@ public class UploadController : ControllerBase
                     FileType = fileType,
                     Competence = competence,
                     Status = "PENDING",
+                    FileSize = file.Length,
                     StoragePath = $"/var/data/uploads/{fileType}/{competence}/{Guid.NewGuid()}_{file.FileName}",
                     UploadedBy_Id = userId,
                     CreatedAt = DateTime.UtcNow

@@ -5,7 +5,7 @@ public class ImportFile
     public int Id { get; set; }
     public string FileName { get; set; }
     public string FileHash { get; set; }
-    public long FileSize { get; set; }
+    public long? FileSize { get; set; }
     public string UploadedBy_Id { get; set; } // Changed to string for IdentityUser
     public DateTime UploadedAt { get; set; }
     public string FileType { get; set; } // PAG, REC, FAT, EMITIDAS, COMP, TRANSF, FOPAG

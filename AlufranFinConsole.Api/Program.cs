@@ -53,14 +53,33 @@ builder.Services
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(5)
         };
-        // Events: expose JWT validation errors via X-Auth-Error header (diagnostic only)
+        // Events: pick the correct Bearer token when Cloudflare injects its own
+        // Authorization header before ours (the concatenated multi-value string
+        // breaks default extraction with "no dots" error).
         options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                // Iterate every Authorization value and pick the first valid JWS token
+                // (exactly 2 dots = header.payload.signature).
+                foreach (var val in context.Request.Headers["Authorization"])
+                {
+                    if (val is null) continue;
+                    var candidate = val.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                        ? val["Bearer ".Length..].Trim()
+                        : val.Trim();
+                    if (candidate.Count(c => c == '.') == 2)
+                    {
+                        context.Token = candidate;
+                        break;
+                    }
+                }
+                return Task.CompletedTask;
+            },
             OnAuthenticationFailed = context =>
             {
                 try
                 {
-                    // JWT error messages can contain newlines — sanitize before setting header
                     var msg = (context.Exception?.Message ?? "unknown error")
                         .Replace('\r', ' ').Replace('\n', ' ');
                     context.Response.Headers["X-Auth-Error"] =

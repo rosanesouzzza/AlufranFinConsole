@@ -66,6 +66,7 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddScoped<AlufranFinConsole.Application.Services.IFileUploadService, AlufranFinConsole.Application.Services.FileUploadService>();
 builder.Services.AddControllers();
 builder.Services.AddCors(options =>
 {

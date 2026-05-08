@@ -231,17 +231,26 @@ public class UploadController : ControllerBase
         if (!string.IsNullOrEmpty(competence))
             query = query.Where(f => f.Competence == competence);
 
-        var stats = query
+        // Materialise to memory first — SQLite does not support SQL APPLY (nested GroupBy in EF).
+        var allFiles = query
+            .Select(f => new { f.FileType, f.Competence, f.Status })
+            .ToList();
+
+        var stats = allFiles
             .GroupBy(f => new { f.FileType, f.Competence })
             .Select(g => new
             {
                 fileType = g.Key.FileType,
                 competence = g.Key.Competence,
                 count = g.Count(),
-                statuses = g.GroupBy(f => f.Status).Select(s => new { status = s.Key, count = s.Count() })
+                statuses = g.GroupBy(f => f.Status)
+                             .Select(s => new { status = s.Key, count = s.Count() })
+                             .ToList()
             })
+            .OrderBy(g => g.competence)
+            .ThenBy(g => g.fileType)
             .ToList();
 
-        return Ok(stats);
+        return Ok(new { total = allFiles.Count, byTypeAndCompetence = stats });
     }
 }

@@ -1,7 +1,7 @@
 services:
   - type: web
     name: alufran-fin-api
-    env: dotnet
+    runtime: dotnet
     region: sfo
     plan: free
     buildCommand: dotnet publish -c Release -o out AlufranFinConsole.Api/AlufranFinConsole.Api.csproj

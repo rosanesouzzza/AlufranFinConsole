@@ -42,6 +42,12 @@ builder.Services
     .AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // UseSecurityTokenValidators = true forces JwtSecurityTokenHandler (the pre-.NET 7 validator)
+        // instead of JsonWebTokenHandler. JwtSecurityTokenHandler correctly honours context.Token
+        // set in OnMessageReceived, while JsonWebTokenHandler re-reads from the Authorization header
+        // (which Cloudflare replaces on Render free tier).
+        options.UseSecurityTokenValidators = true;
+
         options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
@@ -53,10 +59,20 @@ builder.Services
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(5)
         };
-        // Events: pick OUR JWT when Cloudflare injects its own JWT in the same
-        // Authorization header (Cloudflare's token is valid JWS but has no exp/iss).
+
         options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
         {
+            // Read from X-Auth-Token first (Cloudflare doesn't modify custom headers).
+            // JwtSecurityTokenHandler respects context.Token set here, unlike JsonWebTokenHandler.
+            OnMessageReceived = context =>
+            {
+                var xat = context.Request.Headers["X-Auth-Token"].FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(xat))
+                {
+                    context.Token = xat.Trim();
+                }
+                return Task.CompletedTask;
+            },
             OnAuthenticationFailed = context =>
             {
                 try

@@ -9,9 +9,7 @@ public class ClassificationRule
     public string Condition { get; set; } // JSON
     public string Result { get; set; } // JSON
     public bool IsActive { get; set; } = true;
-    public int CreatedBy_Id { get; set; }
+    public string CreatedBy_Id { get; set; } // FK to AspNetUsers (IdentityUser string Id)
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
-
-    public virtual User CreatedBy { get; set; }
 }

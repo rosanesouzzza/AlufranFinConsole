@@ -6,7 +6,7 @@ public class ImportFile
     public string FileName { get; set; }
     public string FileHash { get; set; }
     public long? FileSize { get; set; }
-    public string UploadedBy_Id { get; set; } // Changed to string for IdentityUser
+    public string UploadedBy_Id { get; set; } // FK to AspNetUsers (IdentityUser string Id)
     public DateTime UploadedAt { get; set; }
     public string FileType { get; set; } // PAG, REC, FAT, EMITIDAS, COMP, TRANSF, FOPAG
     public string Competence { get; set; } // YYYY-MM
@@ -14,6 +14,4 @@ public class ImportFile
     public string StoragePath { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
-
-    public virtual User UploadedBy { get; set; }
 }

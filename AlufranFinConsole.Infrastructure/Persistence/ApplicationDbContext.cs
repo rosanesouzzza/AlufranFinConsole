@@ -11,8 +11,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     {
     }
 
-    // Security
-    public DbSet<User> Users { get; set; }
+    // Note: IdentityDbContext already provides DbSet<IdentityUser> Users
 
     // Files & Versioning
     public DbSet<ImportFile> ImportFiles { get; set; }
@@ -32,17 +31,6 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
-        // User
-        modelBuilder.Entity<User>(b =>
-        {
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Email).IsRequired().HasMaxLength(256);
-            b.Property(x => x.PasswordHash).IsRequired();
-            b.Property(x => x.FullName).HasMaxLength(256);
-            b.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-            b.HasIndex(x => x.Email).IsUnique();
-        });
 
         // Company
         modelBuilder.Entity<Company>(b =>
@@ -144,7 +132,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
             b.Property(x => x.Condition).IsRequired().HasColumnType("TEXT");
             b.Property(x => x.Result).IsRequired().HasColumnType("TEXT");
             b.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-            b.HasOne(x => x.CreatedBy).WithMany().HasForeignKey(x => x.CreatedBy_Id);
+            b.Property(x => x.CreatedBy_Id).HasMaxLength(450); // IdentityUser Id length
         });
 
         // ColumnMapping
@@ -168,8 +156,8 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
             b.Property(x => x.Competence).IsRequired().HasMaxLength(7);
             b.Property(x => x.Status).IsRequired().HasMaxLength(20);
             b.Property(x => x.StoragePath).IsRequired();
+            b.Property(x => x.UploadedBy_Id).HasMaxLength(450); // IdentityUser Id length
             b.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-            b.HasOne(x => x.UploadedBy).WithMany().HasForeignKey(x => x.UploadedBy_Id);
         });
     }
 }

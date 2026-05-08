@@ -57,65 +57,6 @@ builder.Services
         // Authorization header (Cloudflare's token is valid JWS but has no exp/iss).
         options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
         {
-            OnMessageReceived = context =>
-            {
-                // Primary path: X-Auth-Token header — Cloudflare never touches custom headers,
-                // so our JWT arrives here intact even behind Render's Cloudflare proxy.
-                var customToken = context.Request.Headers["X-Auth-Token"].FirstOrDefault();
-                if (!string.IsNullOrWhiteSpace(customToken))
-                {
-                    var extracted = customToken.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-                        ? customToken["Bearer ".Length..].Trim()
-                        : customToken.Trim();
-                    context.Token = extracted;
-                    // Diagnostic headers — remove after debugging
-                    try
-                    {
-                        context.Response.Headers["X-Tok-Src"] = "X-Auth-Token";
-                        context.Response.Headers["X-Tok-Len"] = extracted.Length.ToString();
-                        context.Response.Headers["X-Tok-Dots"] = extracted.Count(c => c == '.').ToString();
-                        context.Response.Headers["X-Tok-P30"] = extracted.Length >= 30 ? extracted[..30] : extracted;
-                    }
-                    catch { }
-                    return Task.CompletedTask;
-                }
-
-                // Fallback: attempt to extract our JWT from the Authorization header.
-                // Useful for direct calls (curl, Swagger, local dev) that don't go through Cloudflare.
-                // Cloudflare replaces Authorization with its own token, so this path may fail on Render.
-                var authHeaderStr = context.Request.Headers["Authorization"].ToString();
-
-                // Find every Bearer token that matches the JWS pattern eyJ<hdr>.<payload>.<sig>
-                var matches = System.Text.RegularExpressions.Regex.Matches(
-                    authHeaderStr,
-                    @"Bearer\s+(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-                foreach (System.Text.RegularExpressions.Match m in matches)
-                {
-                    var candidate = m.Groups[1].Value;
-                    var parts = candidate.Split('.');
-                    if (parts.Length != 3) continue;
-
-                    try
-                    {
-                        // Quick base64url-decode the payload to check the issuer.
-                        // Our tokens always carry iss:AlufranConsole; Cloudflare's don't.
-                        var padded = parts[1].Replace('-', '+').Replace('_', '/')
-                            .PadRight(parts[1].Length + (4 - parts[1].Length % 4) % 4, '=');
-                        var payloadJson = System.Text.Encoding.UTF8.GetString(
-                            Convert.FromBase64String(padded));
-
-                        if (payloadJson.Contains("\"iss\":\"AlufranConsole\""))
-                        {
-                            context.Token = candidate;
-                            return Task.CompletedTask;
-                        }
-                    }
-                    catch { /* malformed token – skip */ }
-                }
-                return Task.CompletedTask;
-            },
             OnAuthenticationFailed = context =>
             {
                 try
@@ -177,6 +118,25 @@ app.UseExceptionHandler(errApp =>
 // Authorization header on any HTTPS→HTTP redirect cycle.
 app.UseRouting();
 app.UseCors("AllowAll");
+
+// X-Auth-Token bridge: copy X-Auth-Token → Authorization: Bearer before the JWT middleware.
+// Cloudflare (Render free tier) replaces the Authorization header with its own JWT, but does
+// NOT touch custom headers, so clients send X-Auth-Token: <jwt> instead.
+// Moving it here at the server side ensures the standard JWT Bearer pipeline sees our token.
+app.Use(async (ctx, next) =>
+{
+    if (ctx.Request.Headers.TryGetValue("X-Auth-Token", out var xat) &&
+        !string.IsNullOrWhiteSpace(xat.ToString()) &&
+        !ctx.Request.Headers.ContainsKey("Authorization"))
+    {
+        var raw = xat.ToString().Trim();
+        ctx.Request.Headers["Authorization"] = raw.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? raw
+            : "Bearer " + raw;
+    }
+    await next();
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 

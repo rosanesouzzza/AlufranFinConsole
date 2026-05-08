@@ -53,13 +53,20 @@ builder.Services
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(5)
         };
-        // Expose the exact validation error as a response header for diagnostics
+        // Events: expose JWT validation errors via X-Auth-Error header (diagnostic only)
         options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
         {
             OnAuthenticationFailed = context =>
             {
-                context.Response.Headers["X-Auth-Error"] =
-                    context.Exception.GetType().Name + ": " + context.Exception.Message[..Math.Min(200, context.Exception.Message.Length)];
+                try
+                {
+                    // JWT error messages can contain newlines — sanitize before setting header
+                    var msg = (context.Exception?.Message ?? "unknown error")
+                        .Replace('\r', ' ').Replace('\n', ' ');
+                    context.Response.Headers["X-Auth-Error"] =
+                        msg.Length > 200 ? msg[..200] : msg;
+                }
+                catch { /* never throw from this handler */ }
                 return Task.CompletedTask;
             }
         };
@@ -88,6 +95,23 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// Global error handler: turns empty 500 responses into JSON with the actual error detail
+app.UseExceptionHandler(errApp =>
+{
+    errApp.Run(async ctx =>
+    {
+        var ex = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+        ctx.Response.StatusCode = 500;
+        ctx.Response.ContentType = "application/json";
+        await ctx.Response.WriteAsJsonAsync(new
+        {
+            error = "Internal server error",
+            detail = ex?.Message,
+            type = ex?.GetType().Name
+        });
+    });
+});
 
 // UseHttpsRedirection removed: Render terminates TLS at its proxy layer;
 // the internal connection is plain HTTP and a redirect here would strip the

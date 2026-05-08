@@ -3,16 +3,14 @@ services:
     name: alufran-fin-api
     env: dotnet
     region: sfo
-    plan: standard
+    plan: free
     buildCommand: dotnet publish -c Release -o out AlufranFinConsole.Api/AlufranFinConsole.Api.csproj
     startCommand: cd out && dotnet AlufranFinConsole.Api.dll
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
-      - key: ConnectionStrings__DefaultConnection
-        scope: build
       - key: Jwt__Key
-        scope: build
+        value: AlufranConsoleChaveSeguraMinimo32CaracteresObrigatorio2026
       - key: Jwt__Issuer
         value: AlufranConsole
       - key: Jwt__Audience
@@ -21,15 +19,3 @@ services:
         value: "480"
       - key: ASPNETCORE_URLS
         value: http://+:10000
-    databases:
-      - name: alufran-db
-        dbName: alufran_findb
-        user: alufran_user
-        region: sfo
-
-databases:
-  - name: alufran-db
-    databaseName: alufran_findb
-    user: alufran_user
-    region: sfo
-    plan: standard

@@ -59,8 +59,20 @@ builder.Services
         {
             OnMessageReceived = context =>
             {
-                // Join ALL Authorization header values into one string so that both
-                // "two separate values" and "one comma-joined value" are handled.
+                // Primary path: X-Auth-Token header — Cloudflare never touches custom headers,
+                // so our JWT arrives here intact even behind Render's Cloudflare proxy.
+                var customToken = context.Request.Headers["X-Auth-Token"].FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(customToken))
+                {
+                    context.Token = customToken.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                        ? customToken["Bearer ".Length..].Trim()
+                        : customToken.Trim();
+                    return Task.CompletedTask;
+                }
+
+                // Fallback: attempt to extract our JWT from the Authorization header.
+                // Useful for direct calls (curl, Swagger, local dev) that don't go through Cloudflare.
+                // Cloudflare replaces Authorization with its own token, so this path may fail on Render.
                 var authHeaderStr = context.Request.Headers["Authorization"].ToString();
 
                 // Find every Bearer token that matches the JWS pattern eyJ<hdr>.<payload>.<sig>

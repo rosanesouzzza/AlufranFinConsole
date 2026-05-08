@@ -64,9 +64,19 @@ builder.Services
                 var customToken = context.Request.Headers["X-Auth-Token"].FirstOrDefault();
                 if (!string.IsNullOrWhiteSpace(customToken))
                 {
-                    context.Token = customToken.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                    var extracted = customToken.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
                         ? customToken["Bearer ".Length..].Trim()
                         : customToken.Trim();
+                    context.Token = extracted;
+                    // Diagnostic headers — remove after debugging
+                    try
+                    {
+                        context.Response.Headers["X-Tok-Src"] = "X-Auth-Token";
+                        context.Response.Headers["X-Tok-Len"] = extracted.Length.ToString();
+                        context.Response.Headers["X-Tok-Dots"] = extracted.Count(c => c == '.').ToString();
+                        context.Response.Headers["X-Tok-P30"] = extracted.Length >= 30 ? extracted[..30] : extracted;
+                    }
+                    catch { }
                     return Task.CompletedTask;
                 }
 

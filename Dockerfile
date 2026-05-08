@@ -33,6 +33,13 @@ EXPOSE 10000
 # Set environment variables
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=http://+:10000
+# JWT configuration (double-underscore = nested config in .NET)
+ENV Jwt__Key=AlufranConsoleChaveSeguraMinimo32CaracteresObrigatorio2026
+ENV Jwt__Issuer=AlufranConsole
+ENV Jwt__Audience=AlufranConsoleApp
+ENV Jwt__ExpireMinutes=480
+# Connection string for SQLite
+ENV ConnectionStrings__DefaultConnection="Data Source=/var/data/alufran_api.db"
 
 # Start the application
 ENTRYPOINT ["dotnet", "AlufranFinConsole.Api.dll"]

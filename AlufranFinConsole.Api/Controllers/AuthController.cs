@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
@@ -33,6 +34,48 @@ public class AuthController : ControllerBase
 
         var token = GenerateJwtToken(user);
         return Ok(new { token, userId = user.Id, email = user.Email });
+    }
+
+    /// <summary>Temporary: shows JWT config and validates a token. Remove after debugging.</summary>
+    [HttpGet("debug")]
+    [AllowAnonymous]
+    public IActionResult Debug([FromQuery] string? token = null)
+    {
+        var jwtSettings = _configuration.GetSection("Jwt");
+        var keyValue = jwtSettings["Key"] ?? "(null)";
+        var result = new
+        {
+            issuer = jwtSettings["Issuer"],
+            audience = jwtSettings["Audience"],
+            expireMinutes = jwtSettings["ExpireMinutes"],
+            keyLength = keyValue.Length,
+            keyFirst8 = keyValue.Length >= 8 ? keyValue.Substring(0, 8) + "..." : keyValue,
+            env = System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
+            jwtEnvKey = System.Environment.GetEnvironmentVariable("Jwt__Key")?.Substring(0, 8) + "..."
+        };
+        if (token != null)
+        {
+            try
+            {
+                var handler = new JwtSecurityTokenHandler();
+                var keyBytes = Encoding.ASCII.GetBytes(keyValue);
+                var validParams = new TokenValidationParameters
+                {
+                    IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+                    ValidIssuer = jwtSettings["Issuer"],
+                    ValidAudience = jwtSettings["Audience"],
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero
+                };
+                handler.ValidateToken(token, validParams, out var validated);
+                return Ok(new { config = result, tokenValid = true, tokenClaims = (validated as JwtSecurityToken)?.Claims.Select(c => new { c.Type, c.Value }) });
+            }
+            catch (Exception ex)
+            {
+                return Ok(new { config = result, tokenValid = false, error = ex.Message });
+            }
+        }
+        return Ok(result);
     }
 
     [HttpPost("register")]

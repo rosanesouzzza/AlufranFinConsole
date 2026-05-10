@@ -90,6 +90,8 @@ builder.Services
 
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<AlufranFinConsole.Application.Services.IFileUploadService, AlufranFinConsole.Application.Services.FileUploadService>();
+builder.Services.AddScoped<AlufranFinConsole.Application.Services.ITextNormalizationService, AlufranFinConsole.Application.Services.TextNormalizationService>();
+builder.Services.AddScoped<AlufranFinConsole.Application.Services.IDataValidationService, AlufranFinConsole.Application.Services.DataValidationService>();
 builder.Services.AddControllers();
 builder.Services.AddCors(options =>
 {

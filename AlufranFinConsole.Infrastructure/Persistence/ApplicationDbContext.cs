@@ -15,6 +15,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
 
     // Files & Versioning
     public DbSet<ImportFile> ImportFiles { get; set; }
+    public DbSet<StagingData> StagingData { get; set; }
 
     // Cadastros (Master Data)
     public DbSet<Company> Companies { get; set; }
@@ -158,6 +159,22 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
             b.Property(x => x.StoragePath).IsRequired();
             b.Property(x => x.UploadedBy_Id).HasMaxLength(450); // IdentityUser Id length
             b.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        // StagingData
+        modelBuilder.Entity<StagingData>(b =>
+        {
+            b.HasKey(x => x.Id);
+            b.Property(x => x.LineNumber).IsRequired();
+            b.Property(x => x.RawData).IsRequired().HasColumnType("TEXT");
+            b.Property(x => x.ParsedData).HasColumnType("TEXT");
+            b.Property(x => x.ValidationStatus).IsRequired().HasMaxLength(20);
+            b.Property(x => x.ValidationErrors).HasColumnType("TEXT");
+            b.Property(x => x.SanitizedData).HasColumnType("TEXT");
+            b.Property(x => x.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            b.HasOne(x => x.ImportFile).WithMany().HasForeignKey(x => x.ImportFile_Id);
+            b.HasIndex(x => x.ImportFile_Id);
+            b.HasIndex(x => x.ValidationStatus);
         });
     }
 }

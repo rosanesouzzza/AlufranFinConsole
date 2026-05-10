@@ -1,104 +1,199 @@
 # Console Financeiro Alufran
 
-**Stack 100% Gratuito:** .NET 8 + Blazor Server + PostgreSQL + EF Core
+**Plataforma de Fechamento Financeiro Governado**
+
+**Stack:** .NET 8 + ASP.NET Core + SQLite + EF Core + Razor Pages + JWT
 
 ---
 
-## ⚡ Startup Rápido (5 minutos)
+## ⚡ Como Acessar (Startup em 2 minutos)
 
 ### Pré-requisitos
-- **.NET 8** (Visual Studio Community ou CLI)
-- **PostgreSQL** 15+ local ou servidor
+- **.NET 8** (Visual Studio 2022 Community ou CLI)
+- Nenhuma dependência externa (SQLite embutido)
 
-### 1. Setup PostgreSQL
-
+### 1️⃣ Clonar/Abrir Projeto
 ```bash
-# Windows: Abrir PowerShell como admin
-psql -U postgres
-
-# SQL:
-CREATE DATABASE alufran_fin_close;
-CREATE USER alufran WITH PASSWORD 'alufran';
-ALTER ROLE alufran WITH CREATEDB;
-GRANT ALL PRIVILEGES ON DATABASE alufran_fin_close TO alufran;
-```
-
-Ou rodando o script:
-```bash
-psql -U postgres < setup_db.sql
-```
-
-### 2. Restaurar Dependências
-```bash
-cd AlufranFinConsole
+cd "path\to\AlufranFinConsole"
 dotnet restore
 ```
 
-### 3. Criar Migrations
+### 2️⃣ Criar/Atualizar Banco de Dados
+```bash
+# Aplicar todas as migrations
+dotnet ef database update --project AlufranFinConsole.Infrastructure --startup-project AlufranFinConsole.Api
+```
+
+### 3️⃣ Rodar API (porta 5001)
+```bash
+cd AlufranFinConsole.Api
+dotnet run
+# Acesso: https://localhost:5001/swagger (Swagger UI)
+```
+
+### 4️⃣ Em outro terminal: Rodar Web Frontend (porta 5002)
 ```bash
 cd AlufranFinConsole.Web
-dotnet ef database update
-```
-
-### 4. Rodar Aplicação
-```bash
 dotnet run
+# Acesso: https://localhost:5002
 ```
-
-Acesse: `https://localhost:5001`
 
 ---
 
-## 📁 Estrutura de Projetos
+## 🔐 Credenciais Padrão
+
+**Login automático criado:**
+- **Email:** `admin@alufran.local`
+- **Senha:** `AlufranAdmin@2026`
+
+Encontrado em: `Program.cs` (linhas 171-172)
+
+---
+
+## 📊 Acesso ao Staging (Phase 4)
+
+1. Acesse **https://localhost:5002**
+2. Faça login com as credenciais acima
+3. Clique em **📋 Staging** no navbar
+4. Selecione um arquivo de importação
+5. Clique em **Validar** → **Sanitizar** → **Relatório**
+
+---
+
+## 📁 Arquitetura de Projetos
 
 ```
 AlufranFinConsole/
-├── AlufranFinConsole.Domain/        # Entidades core
-├── AlufranFinConsole.Application/   # Lógica de aplicação
-├── AlufranFinConsole.Infrastructure # EF Core, Storage, Serviços
-├── AlufranFinConsole.Api/           # Controllers REST
-├── AlufranFinConsole.Web/           # Blazor Server UI
-└── AlufranFinConsole.Tests/         # Unit tests
+├── AlufranFinConsole.Domain/              # Entidades & interfaces
+│   └── Entities/
+│       ├── ImportFile.cs
+│       ├── StagingData.cs
+│       └── ...
+│
+├── AlufranFinConsole.Application/         # Serviços & lógica
+│   └── Services/
+│       ├── DataValidationService.cs       # Validação CSV
+│       ├── TextNormalizationService.cs    # Normalização
+│       └── FileUploadService.cs
+│
+├── AlufranFinConsole.Infrastructure/      # EF Core & BD
+│   ├── Persistence/
+│   │   ├── ApplicationDbContext.cs
+│   │   └── Migrations/
+│   └── Storage/
+│
+├── AlufranFinConsole.Api/                 # API REST
+│   ├── Program.cs                         # JWT setup, DI
+│   └── Controllers/
+│       ├── AuthController.cs              # Login/Register
+│       ├── StagingController.cs           # Workflow validação
+│       └── ImportController.cs            # Lista arquivos
+│
+├── AlufranFinConsole.Web/                 # Frontend Razor Pages
+│   ├── Pages/
+│   │   ├── Index.cshtml                   # Home
+│   │   ├── Staging.cshtml                 # Phase 4 UI
+│   │   └── ...
+│   └── Controllers/
+│       └── UploadController.cs            # Upload de arquivos
+│
+└── AlufranFinConsole.Tests/               # Testes unitários
 ```
 
 ---
 
-## 🗄️ Database Connection
+## 🗄️ Banco de Dados
 
-**Arquivo:** `AlufranFinConsole.Web/appsettings.json`
+**Tipo:** SQLite (arquivo: `alufran_console.db`)
 
+**Localização:** `bin/Debug/net8.0/` ou `bin/Release/net8.0/`
+
+**Connection String:**
 ```json
-"DefaultConnection": "Host=localhost;Port=5432;Database=alufran_fin_close;Username=alufran;Password=alufran"
+// appsettings.json
+"DefaultConnection": "Data Source=alufran_console.db"
 ```
 
 ---
 
 ## 🚀 Fases Implementadas
 
-**Fase 1:** ✅ Fundação (Estrutura, Auth, BD)  
-**Fase 2-9:** ⏳ Em desenvolvimento
+| Fase | Status | Descrição |
+|------|--------|-----------|
+| **1** | ✅ | Fundação (Estrutura, Auth, BD, Migrations) |
+| **2** | ✅ | Cadastros (Empresas, Unidades, Fornecedores, Clientes) |
+| **3** | ✅ | Upload & Versionamento (ImportFiles, FileUploadService) |
+| **4** | ✅ | **Staging & Saneamento (DataValidation, Staging UI)** |
+| **5** | ⏳ | Classificação & QA |
+| **6-9** | ⏳ | Consolidado, DRE, Aprovação, Auditoria |
 
 ---
 
-## 📝 Próximos Passos
+## 🔑 Endpoints Principais (API)
 
-1. ✅ Executar `dotnet build` para validar
-2. ✅ Executar migrações (`dotnet ef database update`)
-3. ✅ Rodar aplicação (`dotnet run`)
-4. ⏳ Implementar cadastros (Fase 2)
-5. ⏳ Upload e versionamento (Fase 3)
+### Autenticação
+```
+POST   /api/auth/login           - Login com email/senha
+POST   /api/auth/register        - Registrar novo usuário
+```
+
+### Staging (Phase 4)
+```
+GET    /api/staging/{id}         - Listar registros de staging
+GET    /api/staging/{id}/summary - Resumo de estatísticas
+POST   /api/staging/{id}/validate - Validar dados pendentes
+POST   /api/staging/{id}/sanitize - Sanitizar dados válidos
+GET    /api/staging/{id}/report  - Relatório detalhado
+```
+
+### Importação
+```
+GET    /api/import/list          - Listar arquivos de importação
+GET    /api/import/{id}          - Detalhes do arquivo
+```
+
+---
+
+## 🧪 Testes
+
+```bash
+# Rodar todos os testes
+dotnet test
+
+# Com cobertura
+dotnet test /p:CollectCoverage=true
+```
 
 ---
 
 ## 🔧 Troubleshooting
 
-**Erro: "connection refused"**
-→ Verificar se PostgreSQL está rodando
-
-**Erro: "database does not exist"**
-→ Rodar `dotnet ef database update` novamente
+| Erro | Solução |
+|------|---------|
+| **"Connection refused"** | API não está rodando. Execute `dotnet run` em AlufranFinConsole.Api |
+| **"404 Not Found" ao acessar staging** | Certifique-se de estar logado e que a API está rodando |
+| **"JWT signature validation failed"** | Token expirado ou inválido. Faça login novamente |
+| **Migrations não aplicadas** | Execute: `dotnet ef database update` na pasta raiz |
 
 ---
 
-**Versão:** 1.0  
-**Data:** 2026-05-07
+## 📝 Próximos Passos
+
+1. ✅ **Phase 4 Backend & Frontend** (concluído)
+2. ⏳ Implementar validação para tipos FAT, EMITIDAS, COMP, TRANSF, FOPAG
+3. ⏳ Testes unitários para DataValidationService
+4. ⏳ Phase 5: Classificação & QA
+
+---
+
+## 📚 Documentação Adicional
+
+- `PHASE4_PLAN.md` — Detalhes de Phase 4
+- `ARCHITECTURE.md` — Decisões arquiteturais
+- `SETUP_GUIDE.md` — Guia detalhado de instalação
+
+---
+
+**Versão:** 2.0  
+**Última Atualização:** 2026-05-10  
+**Status:** Phase 4 ✅ | Phase 5+ ⏳

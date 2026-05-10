@@ -25,8 +25,8 @@ public class UploadController : ControllerBase
         if (file == null || file.Length == 0)
             return BadRequest(new { error = "No file provided" });
 
-        var userIdObj = _session.GetString("UserId");
-        if (!int.TryParse(userIdObj, out var userId))
+        var userId = _session.GetString("UserId");
+        if (string.IsNullOrEmpty(userId))
             return Unauthorized(new { error = "User not authenticated" });
 
         try

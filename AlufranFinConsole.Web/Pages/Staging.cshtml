@@ -1,0 +1,256 @@
+@page
+@model StagingModel
+@{
+    ViewData["Title"] = "Staging & Saneamento de Dados";
+}
+
+<div class="container-fluid mt-4">
+    <h1>📋 Validação e Saneamento de Dados</h1>
+    <hr />
+
+    <!-- Seleção de Arquivo -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📤 Selecionar Arquivo para Processar</h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.ImportFiles != null && Model.ImportFiles.Any())
+                    {
+                        <form method="post" asp-page-handler="SelectFile">
+                            <div class="mb-3">
+                                <label for="importFileId" class="form-label">Arquivo de Importação:</label>
+                                <select id="importFileId" name="importFileId" class="form-control" required>
+                                    <option value="">-- Selecione um arquivo --</option>
+                                    @foreach (var file in Model.ImportFiles)
+                                    {
+                                        <option value="@file.Id"
+                                                selected="@(Model.SelectedFileId == file.Id)">
+                                            @file.FileName (@file.FileType) - @file.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search"></i> Carregar
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <p class="text-muted">Nenhum arquivo disponível para staging.</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Resumo de Estatísticas -->
+        @if (Model.Summary != null)
+        {
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">📊 Resumo: @Model.Summary.FileName</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <h6 class="text-secondary">Total</h6>
+                                <h4 class="text-primary">@Model.Summary.TotalLines</h4>
+                            </div>
+                            <div class="col-4">
+                                <h6 class="text-success">Válidos</h6>
+                                <h4 class="text-success">@Model.Summary.Valid</h4>
+                            </div>
+                            <div class="col-4">
+                                <h6 class="text-danger">Inválidos</h6>
+                                <h4 class="text-danger">@Model.Summary.Invalid</h4>
+                            </div>
+                        </div>
+                        <div class="row text-center mt-3">
+                            <div class="col-6">
+                                <h6 class="text-warning">Pendentes</h6>
+                                <h4 class="text-warning">@Model.Summary.Pending</h4>
+                            </div>
+                            <div class="col-6">
+                                <h6 class="text-info">Taxa de Êxito</h6>
+                                <h4 class="text-info">@Model.Summary.PercentValid.ToString("F1")%</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Ações de Processamento -->
+    @if (Model.SelectedFileId > 0)
+    {
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-warning">
+                        <h5 class="mb-0">⚙️ Ações de Processamento</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="btn-group" role="group">
+                            <form method="post" asp-page-handler="Validate" style="display: inline;">
+                                <input type="hidden" name="importFileId" value="@Model.SelectedFileId" />
+                                <button type="submit" class="btn btn-success"
+                                        @(Model.Summary?.Pending == 0 ? "disabled" : "")>
+                                    <i class="bi bi-check-circle"></i> Validar Pendentes (@(Model.Summary?.Pending ?? 0))
+                                </button>
+                            </form>
+
+                            <form method="post" asp-page-handler="Sanitize" style="display: inline;">
+                                <input type="hidden" name="importFileId" value="@Model.SelectedFileId" />
+                                <button type="submit" class="btn btn-info"
+                                        @(Model.Summary?.Valid == 0 ? "disabled" : "")>
+                                    <i class="bi bi-arrow-repeat"></i> Sanitizar Válidos (@(Model.Summary?.Valid ?? 0))
+                                </button>
+                            </form>
+
+                            <form method="post" asp-page-handler="Report" style="display: inline;">
+                                <input type="hidden" name="importFileId" value="@Model.SelectedFileId" />
+                                <button type="submit" class="btn btn-secondary">
+                                    <i class="bi bi-file-text"></i> Gerar Relatório
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Mensagens de Sucesso/Erro -->
+    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle"></i> @Model.SuccessMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-circle"></i> @Model.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Registros de Staging -->
+    @if (Model.StagingRecords != null && Model.StagingRecords.Any())
+    {
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">📝 Registros de Staging (@Model.StagingRecords.Count)</h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Linha</th>
+                                    <th>Status</th>
+                                    <th>Dados Brutos</th>
+                                    <th>Erros</th>
+                                    <th>Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var record in Model.StagingRecords)
+                                {
+                                    <tr>
+                                        <td class="fw-bold">@record.LineNumber</td>
+                                        <td>
+                                            @switch (record.ValidationStatus)
+                                            {
+                                                case "VALID":
+                                                    <span class="badge bg-success">✓ Válido</span>
+                                                    break;
+                                                case "INVALID":
+                                                    <span class="badge bg-danger">✗ Inválido</span>
+                                                    break;
+                                                case "PENDING":
+                                                    <span class="badge bg-warning">⏳ Pendente</span>
+                                                    break;
+                                                case "DUPLICATE":
+                                                    <span class="badge bg-secondary">⚠ Duplicado</span>
+                                                    break;
+                                                case "PROCESSED":
+                                                    <span class="badge bg-info">→ Processado</span>
+                                                    break;
+                                                default:
+                                                    <span class="badge bg-light text-dark">@record.ValidationStatus</span>
+                                                    break;
+                                            }
+                                        </td>
+                                        <td>
+                                            <code class="text-break" style="font-size: 0.85rem;">
+                                                @(record.RawData.Length > 100 ?
+                                                    record.RawData.Substring(0, 100) + "..." :
+                                                    record.RawData)
+                                            </code>
+                                        </td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(record.ValidationErrors))
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                                        data-bs-toggle="popover"
+                                                        data-bs-content="@record.ValidationErrors"
+                                                        title="Erros da Linha @record.LineNumber">
+                                                    <i class="bi bi-exclamation-triangle"></i> Ver
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (record.ValidationStatus == "VALID")
+                                            {
+                                                <span class="badge bg-light text-dark">Pronto</span>
+                                            }
+                                            else if (record.ValidationStatus == "INVALID")
+                                            {
+                                                <span class="badge bg-danger">Erro</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<script>
+    // Inicializar popovers do Bootstrap
+    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
+    const popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+        return new bootstrap.Popover(popoverTriggerEl)
+    })
+</script>
+
+<style>
+    .card {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border: none;
+        margin-bottom: 1.5rem;
+    }
+    .badge {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.6rem;
+    }
+    .table-hover tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+</style>

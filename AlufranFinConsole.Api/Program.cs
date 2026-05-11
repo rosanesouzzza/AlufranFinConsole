@@ -8,11 +8,14 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+// UsePostgres must be explicitly set to true; presence in Production alone is NOT sufficient
+// because Render's free tier uses the SQLite connection string from appsettings.json by default.
+// Passing a SQLite "Data Source=..." string to UseNpgsql causes a native SIGSEGV (exit 139).
 var usePostgres = builder.Configuration.GetValue<bool>("Database:UsePostgres");
 
 builder.Services.AddDbContext<AlufranFinConsole.Infrastructure.Persistence.ApplicationDbContext>(options =>
 {
-    if (usePostgres || builder.Environment.IsProduction())
+    if (usePostgres)
     {
         options.UseNpgsql(connectionString,
             npg => npg.MigrationsAssembly("AlufranFinConsole.Infrastructure"));

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using AlufranFinConsole.Infrastructure.Persistence;
@@ -17,6 +18,8 @@ namespace AlufranFinConsole.Api.Controllers;
 [Authorize]
 public class ProcessingController : ControllerBase
 {
+    private const bool Phase8Enabled = false;
+
     private readonly ApplicationDbContext _context;
     private readonly ILogger<ProcessingController> _logger;
 
@@ -24,6 +27,16 @@ public class ProcessingController : ControllerBase
     {
         _context = context;
         _logger = logger;
+    }
+
+    private IActionResult Phase8Blocked()
+    {
+        return StatusCode(StatusCodes.Status423Locked, new
+        {
+            error = "Fase 8 bloqueada por governança.",
+            phase = "FASE_8",
+            status = "BLOCKED"
+        });
     }
 
     /// <summary>
@@ -328,6 +341,9 @@ public class ProcessingController : ControllerBase
     [HttpGet("status")]
     public async Task<IActionResult> GetStatus([FromQuery] string competence)
     {
+        if (!Phase8Enabled)
+            return Phase8Blocked();
+
         if (string.IsNullOrWhiteSpace(competence) ||
             !System.Text.RegularExpressions.Regex.IsMatch(competence, @"^\d{4}-\d{2}$"))
             return BadRequest(new { error = "competence é obrigatório no formato YYYY-MM" });
@@ -379,6 +395,9 @@ public class ProcessingController : ControllerBase
     [HttpPost("approve")]
     public async Task<IActionResult> Approve([FromQuery] string competence, [FromBody] ApproveRequest req)
     {
+        if (!Phase8Enabled)
+            return Phase8Blocked();
+
         if (string.IsNullOrWhiteSpace(competence) ||
             !System.Text.RegularExpressions.Regex.IsMatch(competence, @"^\d{4}-\d{2}$"))
             return BadRequest(new { error = "competence é obrigatório no formato YYYY-MM" });
@@ -441,6 +460,9 @@ public class ProcessingController : ControllerBase
     [HttpDelete("approve")]
     public async Task<IActionResult> Reopen([FromQuery] string competence, [FromBody] ApproveRequest? req)
     {
+        if (!Phase8Enabled)
+            return Phase8Blocked();
+
         if (string.IsNullOrWhiteSpace(competence) ||
             !System.Text.RegularExpressions.Regex.IsMatch(competence, @"^\d{4}-\d{2}$"))
             return BadRequest(new { error = "competence é obrigatório no formato YYYY-MM" });

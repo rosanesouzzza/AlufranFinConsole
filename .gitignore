@@ -49,6 +49,10 @@ appsettings.Development.json
 *.snupkg
 .nuget/
 
+# Runtime logs (never committed)
+*.log
+api_run.log
+
 # Other
 node_modules/
 .DS_Store

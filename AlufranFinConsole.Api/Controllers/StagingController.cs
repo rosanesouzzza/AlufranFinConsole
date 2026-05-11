@@ -119,8 +119,8 @@ public class StagingController : ControllerBase
         {
             try
             {
-                // Parse
-                var parseResult = _validationService.ParseLine(importFile.FileType, record.RawData);
+                // Parse — short-circuits to pre-parsed JSON for XLSX/PDF rows
+                var parseResult = _validationService.ParseLineOrJson(importFile.FileType, record.RawData, record.ParsedData);
                 if (!parseResult.Success)
                 {
                     record.ValidationStatus = "INVALID";
@@ -271,5 +271,52 @@ public class StagingController : ControllerBase
         };
 
         return Ok(report);
+    }
+
+    /// <summary>
+    /// Ingest (parse) CSV file into staging records.
+    /// Useful for files uploaded before auto-ingest was implemented.
+    /// </summary>
+    [HttpPost("{importFileId}/ingest")]
+    public async Task<IActionResult> IngestStagingRecords(int importFileId)
+    {
+        var importFile = await _context.ImportFiles.FindAsync(importFileId);
+        if (importFile == null)
+            return NotFound(new { error = "Import file not found" });
+
+        if (string.IsNullOrEmpty(importFile.StoragePath) || !System.IO.File.Exists(importFile.StoragePath))
+            return BadRequest(new { error = "File not found on disk", path = importFile.StoragePath });
+
+        // Remove existing staging records (re-ingest)
+        var existing = _context.StagingData.Where(s => s.ImportFile_Id == importFileId);
+        _context.StagingData.RemoveRange(existing);
+
+        var lines = await System.IO.File.ReadAllLinesAsync(importFile.StoragePath);
+        int lineNum = 0, ingested = 0;
+
+        foreach (var line in lines)
+        {
+            lineNum++;
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            _context.StagingData.Add(new StagingData
+            {
+                ImportFile_Id = importFileId,
+                LineNumber = lineNum,
+                RawData = line.Trim(),
+                ParsedData = "",
+                ValidationErrors = "",
+                SanitizedData = "",
+                ValidationStatus = "PENDING",
+                CreatedAt = DateTime.UtcNow
+            });
+            ingested++;
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation($"Ingested {ingested} staging records for file {importFileId}");
+
+        return Ok(new { importFileId, ingested, message = $"{ingested} registros criados com status PENDING" });
     }
 }

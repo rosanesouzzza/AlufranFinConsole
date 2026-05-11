@@ -1,0 +1,178 @@
+@page
+@model UploadModel
+@{
+    ViewData["Title"] = "Upload de Arquivos";
+}
+
+<div class="container-fluid mt-4">
+    <h1>📤 Upload de Arquivos Financeiros</h1>
+    <hr />
+
+    @if (!Model.IsAuthenticated)
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-lock"></i> Você precisa estar autenticado. <a href="/Staging">Faça login aqui</a>.
+        </div>
+    }
+    else
+    {
+
+    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            <i class="bi bi-check-circle"></i> @Model.SuccessMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            <i class="bi bi-exclamation-circle"></i> @Model.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row">
+        <!-- Upload Form -->
+        <div class="col-md-5">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📁 Enviar Arquivo</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" asp-page-handler="Upload">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tipo de Arquivo</label>
+                            <select name="fileType" class="form-select" required>
+                                <option value="">-- Selecione o tipo --</option>
+                                <option value="PAG">PAG – Pagamentos</option>
+                                <option value="REC">REC – Recebimentos</option>
+                                <option value="FAT">FAT – Faturamento</option>
+                                <option value="EMITIDAS">EMITIDAS – Notas Emitidas</option>
+                                <option value="COMP">COMP – Compensações</option>
+                                <option value="TRANSF">TRANSF – Transferências</option>
+                                <option value="FOPAG">FOPAG – Folha de Pagamento</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Competência (AAAA-MM)</label>
+                            <input type="month" name="competence" class="form-control"
+                                   value="2026-04" required placeholder="2026-04" />
+                            <small class="text-muted">Ex: 2026-04 para Abril/2026</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Arquivo</label>
+                            <input type="file" name="file" class="form-control"
+                                   accept=".xlsx,.xls,.pdf,.csv,.txt" required />
+                            <small class="text-muted">
+                                Máx 50 MB. Formatos aceitos:
+                                <span class="badge bg-success">XLSX</span>
+                                <span class="badge bg-danger">PDF</span>
+                                <span class="badge bg-secondary">CSV</span>
+                            </small>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-cloud-upload"></i> Enviar Arquivo
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Formatos esperados -->
+            <div class="card mt-3">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0">📋 Colunas Esperadas (XLSX / CSV)</h6>
+                </div>
+                <div class="card-body p-2">
+                    <small>
+                        <strong>PAG:</strong> <code>documento,fornecedor,valor,data_pagamento,descricao</code><br/>
+                        <strong>REC:</strong> <code>documento,cliente,valor,data_recebimento,descricao</code><br/>
+                        <strong>FAT:</strong> <code>nota_fiscal,cliente,valor,data_emissao,descricao</code><br/>
+                        <strong>EMITIDAS:</strong> <code>numero_nf,destinatario,valor_total,data_emissao,cfop</code><br/>
+                        <strong>COMP:</strong> <code>documento,tipo,valor,data_compensacao,descricao</code><br/>
+                        <strong>TRANSF:</strong> <code>documento,origem,destino,valor,data_transferencia</code><br/>
+                        <strong>FOPAG:</strong> <code>matricula,nome,salario_bruto,descontos,salario_liquido,competencia</code>
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Arquivos enviados -->
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📂 Arquivos Importados (@(Model.ImportFiles?.Count ?? 0))</h5>
+                    <a href="/Staging" class="btn btn-sm btn-outline-light">
+                        <i class="bi bi-arrow-right-circle"></i> Ir para Staging
+                    </a>
+                </div>
+                @if (Model.ImportFiles != null && Model.ImportFiles.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Arquivo</th>
+                                    <th>Tipo</th>
+                                    <th>Competência</th>
+                                    <th>Status</th>
+                                    <th>Enviado em</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var f in Model.ImportFiles)
+                                {
+                                    <tr>
+                                        <td class="text-muted">#@f.Id</td>
+                                        <td><small>@f.FileName</small></td>
+                                        <td><span class="badge bg-info">@f.FileType</span></td>
+                                        <td>@f.Competence</td>
+                                        <td>
+                                            @switch (f.Status)
+                                            {
+                                                case "PENDING":
+                                                    <span class="badge bg-warning">Pendente</span>
+                                                    break;
+                                                case "PROCESSED":
+                                                    <span class="badge bg-success">Processado</span>
+                                                    break;
+                                                case "ERROR":
+                                                    <span class="badge bg-danger">Erro</span>
+                                                    break;
+                                                default:
+                                                    <span class="badge bg-secondary">@f.Status</span>
+                                                    break;
+                                            }
+                                        </td>
+                                        <td><small>@f.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="card-body text-center text-muted py-5">
+                        <i class="bi bi-inbox display-4"></i>
+                        <p class="mt-2">Nenhum arquivo importado ainda.</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    }
+</div>
+
+<style>
+    .card {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border: none;
+        margin-bottom: 1.5rem;
+    }
+</style>

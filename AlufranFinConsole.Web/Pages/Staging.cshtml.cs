@@ -9,6 +9,8 @@ public class StagingModel : PageModel
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<StagingModel> _logger;
+    private readonly IWebHostEnvironment _env;
+    private readonly IConfiguration _config;
 
     public List<ImportFile>? ImportFiles { get; set; }
     public List<StagingRecord>? StagingRecords { get; set; }
@@ -16,20 +18,191 @@ public class StagingModel : PageModel
     public int SelectedFileId { get; set; }
     public string? SuccessMessage { get; set; }
     public string? ErrorMessage { get; set; }
+    public bool IsAuthenticated { get; set; }
 
-    public StagingModel(IHttpClientFactory httpClientFactory, ILogger<StagingModel> logger)
+    [BindProperty]
+    public string? LoginEmail { get; set; }
+
+    [BindProperty]
+    public string? LoginPassword { get; set; }
+
+    public StagingModel(IHttpClientFactory httpClientFactory, ILogger<StagingModel> logger,
+        IWebHostEnvironment env, IConfiguration config)
     {
         _httpClient = httpClientFactory.CreateClient("ApiClient");
         _logger = logger;
+        _env = env;
+        _config = config;
     }
 
     public async Task OnGetAsync()
     {
-        await LoadImportFiles();
+        CheckAuthentication();
+
+        // Auto-login em modo Development para facilitar testes locais
+        if (!IsAuthenticated && _env.IsDevelopment())
+        {
+            await TryAutoLoginAsync();
+        }
+
+        if (IsAuthenticated)
+        {
+            await LoadImportFiles();
+        }
+    }
+
+    private async Task TryAutoLoginAsync()
+    {
+        try
+        {
+            var email = _config["DevLogin:Email"] ?? "admin@alufran.local";
+            var password = _config["DevLogin:Password"] ?? "AlufranAdmin@2026";
+
+            var loginRequest = new { email, password };
+            var jsonContent = System.Text.Json.JsonSerializer.Serialize(loginRequest);
+            var content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync("/api/auth/login", content);
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(responseContent);
+                if (doc.RootElement.TryGetProperty("token", out var tokenElement))
+                {
+                    var token = tokenElement.GetString();
+                    HttpContext.Session.SetString("AuthToken", token!);
+                    HttpContext.Session.SetString("UserEmail", email);
+                    IsAuthenticated = true;
+                    _logger.LogInformation("Auto-login em modo Development realizado para {Email}.", email);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Auto-login falhou: {Msg}", ex.Message);
+        }
+    }
+
+    public async Task<IActionResult> OnPostLoginAsync()
+    {
+        if (string.IsNullOrEmpty(LoginEmail) || string.IsNullOrEmpty(LoginPassword))
+        {
+            ErrorMessage = "Email e senha são obrigatórios.";
+            CheckAuthentication();
+            return Page();
+        }
+
+        try
+        {
+            var loginRequest = new { email = LoginEmail, password = LoginPassword };
+            var jsonContent = System.Text.Json.JsonSerializer.Serialize(loginRequest);
+            var content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync("/api/auth/login", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                using var doc = JsonDocument.Parse(responseContent);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("token", out var tokenElement))
+                {
+                    var token = tokenElement.GetString();
+
+                    HttpContext.Session.SetString("AuthToken", token!);
+                    HttpContext.Session.SetString("UserEmail", LoginEmail);
+
+                    // Persistir em cookie HttpOnly para sobreviver a restarts do servidor
+                    var cookieOpts = new Microsoft.AspNetCore.Http.CookieOptions
+                    {
+                        HttpOnly = true,
+                        Secure = false,
+                        SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax,
+                        Expires = DateTimeOffset.UtcNow.AddHours(8)
+                    };
+                    Response.Cookies.Append("AlufranAuthToken", token!, cookieOpts);
+                    Response.Cookies.Append("AlufranUserEmail", LoginEmail!, cookieOpts);
+
+                    _logger.LogInformation($"Usuário {LoginEmail} autenticado com sucesso na página Staging.");
+
+                    CheckAuthentication();
+                    await LoadImportFiles();
+                    SuccessMessage = "Login realizado com sucesso!";
+                    return Page();
+                }
+                else
+                {
+                    ErrorMessage = "Resposta de autenticação inválida.";
+                    CheckAuthentication();
+                    return Page();
+                }
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                ErrorMessage = "Email ou senha inválidos.";
+                _logger.LogWarning($"Tentativa de login falhou para {LoginEmail} na página Staging.");
+                CheckAuthentication();
+                return Page();
+            }
+            else
+            {
+                ErrorMessage = $"Erro na autenticação: {response.StatusCode}";
+                _logger.LogError($"Erro ao autenticar na página Staging: {response.StatusCode}");
+                CheckAuthentication();
+                return Page();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Erro na autenticação na página Staging: {ex.Message}");
+            ErrorMessage = $"Erro ao conectar com o servidor: {ex.Message}";
+            CheckAuthentication();
+            return Page();
+        }
+    }
+
+    private void CheckAuthentication()
+    {
+        var token = HttpContext.Session.GetString("AuthToken");
+
+        // Fallback: restaurar sessão a partir do cookie persistente (sobrevive a restarts)
+        if (string.IsNullOrEmpty(token))
+        {
+            token = Request.Cookies["AlufranAuthToken"];
+            if (!string.IsNullOrEmpty(token))
+            {
+                HttpContext.Session.SetString("AuthToken", token);
+                var email = Request.Cookies["AlufranUserEmail"] ?? "";
+                if (!string.IsNullOrEmpty(email))
+                    HttpContext.Session.SetString("UserEmail", email);
+                _logger.LogInformation("Sessão restaurada a partir do cookie persistente.");
+            }
+        }
+
+        IsAuthenticated = !string.IsNullOrEmpty(token);
+    }
+
+    /// <summary>
+    /// Garante autenticação em todos os handlers — inclui auto-login em Development.
+    /// Retorna o token JWT ou null se não autenticado.
+    /// </summary>
+    private async Task<string?> EnsureAuthenticatedAsync()
+    {
+        CheckAuthentication();
+        if (!IsAuthenticated && _env.IsDevelopment())
+            await TryAutoLoginAsync();
+
+        var token = HttpContext.Session.GetString("AuthToken");
+        if (string.IsNullOrEmpty(token))
+            ErrorMessage = "Não autenticado. Por favor, faça login.";
+        return token;
     }
 
     public async Task OnPostSelectFileAsync(int importFileId)
     {
+        await EnsureAuthenticatedAsync();
         SelectedFileId = importFileId;
         await LoadImportFiles();
         if (importFileId > 0)
@@ -43,10 +216,10 @@ public class StagingModel : PageModel
     {
         try
         {
-            var token = HttpContext.Session.GetString("AuthToken");
+            var token = await EnsureAuthenticatedAsync();
             if (string.IsNullOrEmpty(token))
             {
-                ErrorMessage = "Não autenticado. Faça login novamente.";
+                await LoadImportFiles();
                 return;
             }
 
@@ -79,12 +252,8 @@ public class StagingModel : PageModel
     {
         try
         {
-            var token = HttpContext.Session.GetString("AuthToken");
-            if (string.IsNullOrEmpty(token))
-            {
-                ErrorMessage = "Não autenticado. Faça login novamente.";
-                return;
-            }
+            var token = await EnsureAuthenticatedAsync();
+            if (string.IsNullOrEmpty(token)) { await LoadImportFiles(); return; }
 
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
@@ -114,12 +283,8 @@ public class StagingModel : PageModel
     {
         try
         {
-            var token = HttpContext.Session.GetString("AuthToken");
-            if (string.IsNullOrEmpty(token))
-            {
-                ErrorMessage = "Não autenticado. Faça login novamente.";
-                return;
-            }
+            var token = await EnsureAuthenticatedAsync();
+            if (string.IsNullOrEmpty(token)) { await LoadImportFiles(); return; }
 
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 

@@ -71,6 +71,16 @@ namespace AlufranFinConsole.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("BaseType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("*");
+
+                    b.Property<int?>("ChartOfAccount_Id")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Condition")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -81,9 +91,22 @@ namespace AlufranFinConsole.Infrastructure.Migrations
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("CreatedBy_Id")
-                        .IsRequired()
                         .HasMaxLength(450)
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("DreGroup")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("DreOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DreSubgroup")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ErpCategory_Id")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
@@ -97,7 +120,6 @@ namespace AlufranFinConsole.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Result")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("RuleType")
@@ -158,11 +180,63 @@ namespace AlufranFinConsole.Infrastructure.Migrations
                     b.ToTable("Clients");
                 });
 
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.ClosingApproval", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ApprovedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ApprovedBy")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Competence")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("DreSnapshot")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Competence");
+
+                    b.HasIndex("Competence", "Status");
+
+                    b.ToTable("ClosingApprovals");
+                });
+
             modelBuilder.Entity("AlufranFinConsole.Domain.Entities.ColumnMapping", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("BaseType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -175,31 +249,37 @@ namespace AlufranFinConsole.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("FileType")
-                        .IsRequired()
-                        .HasMaxLength(20)
+                        .HasMaxLength(512)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("SourceColumn")
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("ShouldKeep")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SourceColumnName")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("TargetColumn")
+                    b.Property<string>("TargetColumnName")
                         .IsRequired()
                         .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TransformationRule")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BaseType", "SourceColumnName");
 
                     b.ToTable("ColumnMappings");
                 });
@@ -248,6 +328,58 @@ namespace AlufranFinConsole.Infrastructure.Migrations
                     b.ToTable("Companies");
                 });
 
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.DiscardedRow", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BaseType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Competence")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("DiscardDetail")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DiscardReason")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("FileVersion_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("OriginalRowNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ProcessingRun_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RawJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DiscardReason");
+
+                    b.HasIndex("ProcessingRun_Id");
+
+                    b.ToTable("DiscardedRows");
+                });
+
             modelBuilder.Entity("AlufranFinConsole.Domain.Entities.ErpCategory", b =>
                 {
                     b.Property<int>("Id")
@@ -265,7 +397,17 @@ namespace AlufranFinConsole.Infrastructure.Migrations
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("Description")
-                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DreGroup")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("DreOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DreSubgroup")
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ErpCategoryKey")
@@ -290,6 +432,250 @@ namespace AlufranFinConsole.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("ErpCategories");
+                });
+
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.FileVersion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("CreatedBy_Id")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FileHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ImportFile_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StoragePath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImportFile_Id", "VersionNumber")
+                        .IsUnique();
+
+                    b.ToTable("FileVersions");
+                });
+
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.FinancialFact", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("AmountCash")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("AmountCompetence")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("BaseType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ChartOfAccount_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ClassificationStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("Client_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Company_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Competence")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("DocumentNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DreGroup")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("DreOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DreSubgroup")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("DueDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ErpCategory_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("IssueDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("PaymentDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProcessingRun_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Product_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("ReceiptDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("Service_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SourceStagingRow_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Supplier_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Unit_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DreGroup");
+
+                    b.HasIndex("ProcessingRun_Id");
+
+                    b.HasIndex("Competence", "BaseType");
+
+                    b.ToTable("FinancialFacts");
+                });
+
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.FinancialTransaction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Categoria")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Competence")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContaDestino")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContaOrigem")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Counterpart")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CounterpartKey")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTime>("DataTransacao")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("DataVencimento")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Descricao")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Documento")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ImportFile_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ProcessedBy_Id")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("StagingData_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("ATIVO");
+
+                    b.Property<string>("StatusTitulo")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TransactionType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImportFile_Id");
+
+                    b.HasIndex("StagingData_Id")
+                        .IsUnique();
+
+                    b.HasIndex("Competence", "TransactionType");
+
+                    b.ToTable("FinancialTransactions");
                 });
 
             modelBuilder.Entity("AlufranFinConsole.Domain.Entities.ImportFile", b =>
@@ -351,6 +737,151 @@ namespace AlufranFinConsole.Infrastructure.Migrations
                     b.ToTable("ImportFiles");
                 });
 
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.PayrollEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Cargo")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Competence")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<decimal>("Descontos")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Funcionario")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FuncionarioKey")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ImportFile_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Matricula")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProcessedBy_Id")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("StagingData_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("ATIVO");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ValorBruto")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("ValorLiquido")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImportFile_Id");
+
+                    b.HasIndex("StagingData_Id")
+                        .IsUnique();
+
+                    b.HasIndex("Competence", "Matricula");
+
+                    b.ToTable("PayrollEntries");
+                });
+
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.ProcessingRun", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BaseType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Competence")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("DiscardedRows")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("FactsGenerated")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("FileVersion_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("QaRows")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StartedBy_Id")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Summary")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TotalRows")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ValidRows")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FileVersion_Id");
+
+                    b.HasIndex("BaseType", "Competence");
+
+                    b.ToTable("ProcessingRuns");
+                });
+
             modelBuilder.Entity("AlufranFinConsole.Domain.Entities.Product", b =>
                 {
                     b.Property<int>("Id")
@@ -389,6 +920,75 @@ namespace AlufranFinConsole.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.QaIssue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BaseType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Competence")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("FileVersion_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("IssueType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NormalizedJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("OriginalRowNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ProcessingRun_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RawJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessingRun_Id");
+
+                    b.HasIndex("Severity", "Status");
+
+                    b.ToTable("QaIssues");
                 });
 
             modelBuilder.Entity("AlufranFinConsole.Domain.Entities.Service", b =>
@@ -482,6 +1082,72 @@ namespace AlufranFinConsole.Infrastructure.Migrations
                     b.HasIndex("ValidationStatus");
 
                     b.ToTable("StagingData");
+                });
+
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.StagingRow", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BaseType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Competence")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("FileVersionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ImportFileId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LineHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LineStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NormalizedJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("OriginalRowNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ProcessingRun_Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RawJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StatusReason")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LineHash");
+
+                    b.HasIndex("LineStatus");
+
+                    b.HasIndex("ProcessingRun_Id");
+
+                    b.ToTable("StagingRows");
                 });
 
             modelBuilder.Entity("AlufranFinConsole.Domain.Entities.Supplier", b =>
@@ -772,6 +1438,99 @@ namespace AlufranFinConsole.Infrastructure.Migrations
                     b.Navigation("Parent");
                 });
 
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.DiscardedRow", b =>
+                {
+                    b.HasOne("AlufranFinConsole.Domain.Entities.ProcessingRun", "ProcessingRun")
+                        .WithMany()
+                        .HasForeignKey("ProcessingRun_Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProcessingRun");
+                });
+
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.FileVersion", b =>
+                {
+                    b.HasOne("AlufranFinConsole.Domain.Entities.ImportFile", "ImportFile")
+                        .WithMany()
+                        .HasForeignKey("ImportFile_Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ImportFile");
+                });
+
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.FinancialFact", b =>
+                {
+                    b.HasOne("AlufranFinConsole.Domain.Entities.ProcessingRun", "ProcessingRun")
+                        .WithMany()
+                        .HasForeignKey("ProcessingRun_Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProcessingRun");
+                });
+
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.FinancialTransaction", b =>
+                {
+                    b.HasOne("AlufranFinConsole.Domain.Entities.ImportFile", "ImportFile")
+                        .WithMany()
+                        .HasForeignKey("ImportFile_Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AlufranFinConsole.Domain.Entities.StagingData", "StagingData")
+                        .WithMany()
+                        .HasForeignKey("StagingData_Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ImportFile");
+
+                    b.Navigation("StagingData");
+                });
+
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.PayrollEntry", b =>
+                {
+                    b.HasOne("AlufranFinConsole.Domain.Entities.ImportFile", "ImportFile")
+                        .WithMany()
+                        .HasForeignKey("ImportFile_Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AlufranFinConsole.Domain.Entities.StagingData", "StagingData")
+                        .WithMany()
+                        .HasForeignKey("StagingData_Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ImportFile");
+
+                    b.Navigation("StagingData");
+                });
+
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.ProcessingRun", b =>
+                {
+                    b.HasOne("AlufranFinConsole.Domain.Entities.FileVersion", "FileVersion")
+                        .WithMany()
+                        .HasForeignKey("FileVersion_Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FileVersion");
+                });
+
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.QaIssue", b =>
+                {
+                    b.HasOne("AlufranFinConsole.Domain.Entities.ProcessingRun", "ProcessingRun")
+                        .WithMany()
+                        .HasForeignKey("ProcessingRun_Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProcessingRun");
+                });
+
             modelBuilder.Entity("AlufranFinConsole.Domain.Entities.StagingData", b =>
                 {
                     b.HasOne("AlufranFinConsole.Domain.Entities.ImportFile", "ImportFile")
@@ -781,6 +1540,17 @@ namespace AlufranFinConsole.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("ImportFile");
+                });
+
+            modelBuilder.Entity("AlufranFinConsole.Domain.Entities.StagingRow", b =>
+                {
+                    b.HasOne("AlufranFinConsole.Domain.Entities.ProcessingRun", "ProcessingRun")
+                        .WithMany()
+                        .HasForeignKey("ProcessingRun_Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProcessingRun");
                 });
 
             modelBuilder.Entity("AlufranFinConsole.Domain.Entities.Unit", b =>

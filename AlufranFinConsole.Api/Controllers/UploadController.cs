@@ -6,6 +6,7 @@ using AlufranFinConsole.Application.Services;
 using AlufranFinConsole.Infrastructure.Persistence;
 using AlufranFinConsole.Domain.Entities;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace AlufranFinConsole.Api.Controllers;
 
@@ -21,6 +22,7 @@ public class UploadController : ControllerBase
     private readonly IFileUploadService _uploadService;
     private readonly ApplicationDbContext _context;
     private readonly ILogger<UploadController> _logger;
+    private readonly string _uploadBasePath;
 
     // Supported file types
     private static readonly string[] ValidFileTypes = { "PAG", "REC", "FAT", "EMITIDAS", "COMP", "TRANSF", "FOPAG" };
@@ -29,11 +31,17 @@ public class UploadController : ControllerBase
     public UploadController(
         IFileUploadService uploadService,
         ApplicationDbContext context,
-        ILogger<UploadController> logger)
+        ILogger<UploadController> logger,
+        IConfiguration configuration)
     {
         _uploadService = uploadService;
         _context = context;
         _logger = logger;
+        // Use configurable path — defaults to "uploads" relative to the app directory
+        var configuredPath = configuration["Storage:UploadPath"] ?? "uploads";
+        _uploadBasePath = Path.IsPathRooted(configuredPath)
+            ? configuredPath
+            : Path.Combine(AppContext.BaseDirectory, configuredPath);
     }
 
     /// <summary>
@@ -54,6 +62,11 @@ public class UploadController : ControllerBase
 
             if (file.Length > MaxFileSize)
                 return BadRequest(new { error = $"File exceeds maximum size of {MaxFileSize / 1024 / 1024} MB" });
+
+            // Validate file extension
+            var fileExt = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (fileExt is not (".xlsx" or ".xls" or ".pdf" or ".csv" or ".txt"))
+                return BadRequest(new { error = "Extensão não suportada. Use .xlsx, .pdf ou .csv" });
 
             if (string.IsNullOrWhiteSpace(fileType))
                 return BadRequest(new { error = "fileType is required" });
@@ -86,7 +99,7 @@ public class UploadController : ControllerBase
                     Competence = competence,
                     Status = "PENDING",
                     FileSize = file.Length,
-                    StoragePath = $"/var/data/uploads/{fileType}/{competence}/{Guid.NewGuid()}_{file.FileName}",
+                    StoragePath = Path.Combine(_uploadBasePath, fileType, competence, $"{Guid.NewGuid()}_{file.FileName}"),
                     UploadedBy_Id = userId,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -113,8 +126,8 @@ public class UploadController : ControllerBase
                     });
                 }
 
-                // Save file to storage
-                var uploadDir = Path.Combine("/var/data/uploads", fileType, competence);
+                // Save file to storage (cross-platform path)
+                var uploadDir = Path.Combine(_uploadBasePath, fileType, competence);
                 Directory.CreateDirectory(uploadDir);
                 var filePath = Path.Combine(uploadDir, $"{importFile.FileHash}_{file.FileName}");
 
@@ -130,6 +143,40 @@ public class UploadController : ControllerBase
                 _context.ImportFiles.Add(importFile);
                 await _context.SaveChangesAsync();
 
+                // ── Fase 4: Ingestão automática — CSV, XLSX e PDF ──────────────────
+                int stagingCount = 0;
+                try
+                {
+                    // FileRowExtractor handles CSV, XLSX and PDF transparently.
+                    // For XLSX it pre-populates ParsedDataJson so the validate step
+                    // can skip CSV re-parsing (ParseLineOrJson short-circuit).
+                    var extractedRows = FileRowExtractor.Extract(filePath, fileType);
+                    foreach (var row in extractedRows)
+                    {
+                        _context.StagingData.Add(new AlufranFinConsole.Domain.Entities.StagingData
+                        {
+                            ImportFile_Id     = importFile.Id,
+                            LineNumber        = row.LineNumber,
+                            RawData           = row.RawData,
+                            ParsedData        = row.ParsedDataJson ?? "",
+                            ValidationErrors  = "",
+                            SanitizedData     = "",
+                            ValidationStatus  = "PENDING",
+                            CreatedAt         = DateTime.UtcNow
+                        });
+                        stagingCount++;
+                    }
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation(
+                        "Ingested {Count} staging records for file {Id} ({Ext})",
+                        stagingCount, importFile.Id, fileExt);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Staging ingest error for file {Id}: {Msg}", importFile.Id, ex.Message);
+                    // Upload succeeded even if staging ingest fails
+                }
+
                 _logger.LogInformation($"File uploaded successfully: {importFile.Id} ({importFile.FileHash})");
 
                 return CreatedAtAction(nameof(GetFile), new { id = importFile.Id }, new
@@ -140,6 +187,7 @@ public class UploadController : ControllerBase
                     fileType = importFile.FileType,
                     competence = importFile.Competence,
                     status = importFile.Status,
+                    stagingRecords = stagingCount,
                     uploadedAt = importFile.CreatedAt,
                     uploadedBy = userId
                 });

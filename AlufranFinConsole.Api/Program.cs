@@ -8,17 +8,25 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var usePostgres = builder.Configuration.GetValue<bool>("Database:UsePostgres");
+
 builder.Services.AddDbContext<AlufranFinConsole.Infrastructure.Persistence.ApplicationDbContext>(options =>
 {
-    if (builder.Environment.IsProduction())
+    if (usePostgres || builder.Environment.IsProduction())
     {
-        options.UseSqlite(connectionString);
+        options.UseNpgsql(connectionString,
+            npg => npg.MigrationsAssembly("AlufranFinConsole.Infrastructure"));
     }
     else
     {
-        options.UseSqlite(connectionString);
+        options.UseSqlite(connectionString,
+            sqlite => sqlite.MigrationsAssembly("AlufranFinConsole.Infrastructure"));
     }
 });
+
+// IApplicationDbContext — expõe o DbContext como interface para Application Services
+builder.Services.AddScoped<AlufranFinConsole.Application.Services.IApplicationDbContext>(
+    sp => sp.GetRequiredService<AlufranFinConsole.Infrastructure.Persistence.ApplicationDbContext>());
 
 // AddIdentityCore does NOT register cookie auth as the default scheme,
 // so JWT Bearer can be the sole default authenticator for this API.
@@ -89,9 +97,17 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
-builder.Services.AddScoped<AlufranFinConsole.Application.Services.IFileUploadService, AlufranFinConsole.Application.Services.FileUploadService>();
-builder.Services.AddScoped<AlufranFinConsole.Application.Services.ITextNormalizationService, AlufranFinConsole.Application.Services.TextNormalizationService>();
-builder.Services.AddScoped<AlufranFinConsole.Application.Services.IDataValidationService, AlufranFinConsole.Application.Services.DataValidationService>();
+
+// ── Application Services (Fase 7 — Pipeline de Saneamento) ─────────────────
+builder.Services.AddScoped<AlufranFinConsole.Application.Services.IFileUploadService,              AlufranFinConsole.Application.Services.FileUploadService>();
+builder.Services.AddScoped<AlufranFinConsole.Application.Services.ITextNormalizationService,       AlufranFinConsole.Application.Services.TextNormalizationService>();
+builder.Services.AddScoped<AlufranFinConsole.Application.Services.IDataValidationService,          AlufranFinConsole.Application.Services.DataValidationService>();
+builder.Services.AddScoped<AlufranFinConsole.Application.Services.IColumnMappingService,           AlufranFinConsole.Application.Services.ColumnMappingService>();
+builder.Services.AddScoped<AlufranFinConsole.Application.Services.IDiscardService,                 AlufranFinConsole.Application.Services.DiscardService>();
+builder.Services.AddScoped<AlufranFinConsole.Application.Services.IQaIssueService,                 AlufranFinConsole.Application.Services.QaIssueService>();
+builder.Services.AddScoped<AlufranFinConsole.Application.Services.IClassificationService,          AlufranFinConsole.Application.Services.ClassificationService>();
+builder.Services.AddScoped<AlufranFinConsole.Application.Services.IFinancialSanitizationService,   AlufranFinConsole.Application.Services.FinancialSanitizationService>();
+
 builder.Services.AddControllers();
 builder.Services.AddCors(options =>
 {
@@ -171,6 +187,11 @@ using (var scope = app.Services.CreateScope())
         var admin = new Microsoft.AspNetCore.Identity.IdentityUser { UserName = "admin@alufran.local", Email = "admin@alufran.local" };
         userManager.CreateAsync(admin, "AlufranAdmin@2026").GetAwaiter().GetResult();
     }
+
+    // Seed default ColumnMappings (idempotent — skips if table already has rows)
+    var mappingSvc = scope.ServiceProvider
+        .GetRequiredService<AlufranFinConsole.Application.Services.IColumnMappingService>();
+    mappingSvc.SeedDefaultMappingsAsync().GetAwaiter().GetResult();
 }
 
 app.Run();

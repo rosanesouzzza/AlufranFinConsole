@@ -1,0 +1,499 @@
+@page
+@model DreModel
+@{
+    ViewData["Title"] = "DRE";
+    var ptBR = new System.Globalization.CultureInfo("pt-BR");
+    string C(decimal v)  => v.ToString("C", ptBR);
+    string Pct(decimal v) => v.ToString("N2") + "%";
+}
+
+@if (!Model.IsAuthenticated)
+{
+    <div class="text-center mt-5 py-5">
+        <i class="bi bi-file-earmark-bar-graph display-1 text-primary"></i>
+        <h1 class="mt-3">DRE — Demonstrativo de Resultado</h1>
+        <p class="lead text-muted">Plataforma de Fechamento Financeiro Governado</p>
+        <a href="/Staging" class="btn btn-primary btn-lg mt-2">
+            <i class="bi bi-box-arrow-in-right"></i> Fazer Login
+        </a>
+    </div>
+}
+else
+{
+<div class="container-fluid mt-3">
+
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="mb-0">
+                <i class="bi bi-file-earmark-bar-graph text-primary"></i> DRE
+            </h1>
+            <small class="text-muted">Demonstrativo de Resultado do Exercício · @DateTime.Now.ToString("dd/MM/yyyy HH:mm")</small>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <!-- Seletor de competência -->
+            <form method="get" class="d-flex gap-2">
+                <select name="competence" class="form-select form-select-sm" style="min-width:150px;"
+                        onchange="this.form.submit()">
+                    @foreach (var c in Model.CompetenceOptions)
+                    {
+                        var selComp = DateTime.TryParseExact(c + "-01", "yyyy-MM-dd", null,
+                            System.Globalization.DateTimeStyles.None, out var dc)
+                            ? dc.ToString("MMMM/yyyy", ptBR).ToUpper() : c;
+                        if (c == Model.Competence)
+                        {
+                            <option value="@c" selected>@selComp</option>
+                        }
+                        else
+                        {
+                            <option value="@c">@selComp</option>
+                        }
+                    }
+                </select>
+            </form>
+            <a href="/Dashboard" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </a>
+            <a href="/Processing?competence=@Model.Competence" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-bar-chart-line"></i> Processamento
+            </a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-warning">@Model.ErrorMessage</div>
+    }
+
+    <!-- ── Painel de Aprovação ── -->
+    @if (Model.Status != null)
+    {
+        var st = Model.Status;
+        if (st.IsAprovado)
+        {
+        <div class="alert alert-success d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <i class="bi bi-patch-check-fill fs-4 me-2"></i>
+                <strong>FECHAMENTO APROVADO</strong>
+                <span class="ms-2 text-muted small">
+                    por <strong>@st.ApprovedBy</strong>
+                    em @st.ApprovedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm", ptBR)
+                    @if (!string.IsNullOrEmpty(st.Notes)) { <span>· "@st.Notes"</span> }
+                </span>
+            </div>
+            <form method="post" asp-page-handler="Reopen" class="d-flex gap-2 align-items-center ms-3">
+                <input type="hidden" name="competence" value="@Model.Competence" />
+                <input type="text" name="ApproveNotes" class="form-control form-control-sm" placeholder="Motivo da reabertura" style="min-width:180px;" />
+                <button type="submit" class="btn btn-outline-warning btn-sm text-nowrap"
+                        onclick="return confirm('Reabrir este fechamento? O status de aprovação será removido.')">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reabrir
+                </button>
+            </form>
+        </div>
+        }
+        else if (st.PodeAprovar)
+        {
+        <div class="alert alert-info d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <i class="bi bi-hourglass-split fs-4 me-2"></i>
+                <strong>PRONTO PARA APROVAÇÃO</strong>
+                <span class="ms-2 text-muted small">
+                    Pipeline @st.CompletedFiles/@st.TotalFiles concluído · DRE gerada · aguardando aprovação formal
+                </span>
+            </div>
+            <form method="post" asp-page-handler="Approve" class="d-flex gap-2 align-items-center ms-3">
+                <input type="hidden" name="competence" value="@Model.Competence" />
+                <input type="text" name="ApproveNotes" class="form-control form-control-sm" placeholder="Observações (opcional)" style="min-width:180px;" />
+                <button type="submit" class="btn btn-success btn-sm text-nowrap">
+                    <i class="bi bi-patch-check"></i> Aprovar Fechamento
+                </button>
+            </form>
+        </div>
+        }
+        else
+        {
+        <div class="alert alert-secondary mb-3">
+            <i class="bi bi-clock-history me-2"></i>
+            <strong>EM ANDAMENTO</strong>
+            <span class="ms-2 text-muted small">
+                Pipeline @st.CompletedFiles/@st.TotalFiles arquivos processados.
+                Complete o processamento antes de aprovar.
+            </span>
+        </div>
+        }
+    }
+
+    @if (Model.Dre == null)
+    {
+        <div class="card border-0 text-center py-5">
+            <div class="card-body text-muted">
+                <i class="bi bi-inbox display-4"></i>
+                <p class="mt-3">Nenhuma competência com dados processados.</p>
+                <a href="/Processing" class="btn btn-primary">
+                    <i class="bi bi-play-circle"></i> Ir para Processamento
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+    var dre = Model.Dre;
+    var superavit = dre.ResultadoLiquido.Valor >= 0;
+    var resClass  = superavit ? "text-success" : "text-danger";
+
+    <div class="row g-3">
+
+        <!-- ── DRE Principal ─────────────────────────── -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-dark text-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">
+                                <i class="bi bi-file-earmark-bar-graph"></i>
+                                Demonstrativo de Resultado — @dre.CompetenceDisplay
+                            </h5>
+                            <small class="opacity-75">Gerado em @dre.GeradoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm", ptBR)</small>
+                        </div>
+                        <span class="badge @(superavit ? "bg-success" : "bg-danger") fs-6 px-3">
+                            <i class="bi @(superavit ? "bi-graph-up-arrow" : "bi-graph-down-arrow")"></i>
+                            @dre.ResultadoLiquido.Label
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0 dre-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:55%">Descrição</th>
+                                <th class="text-end" style="width:25%">Valor (R$)</th>
+                                <th class="text-end" style="width:20%">% Receita</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                            <!-- 1. RECEITA BRUTA -->
+                            <tr class="dre-group bg-light">
+                                <td><span class="dre-num text-muted">1</span> <strong>RECEITA BRUTA</strong></td>
+                                <td class="text-end fw-bold text-success">@C(dre.ReceitaBruta.Valor)</td>
+                                <td class="text-end text-muted">100,00%</td>
+                            </tr>
+                            @foreach (var i in dre.ReceitaBruta.Itens)
+                            {
+                                <tr class="dre-item">
+                                    <td class="ps-4 text-muted"><span class="dre-num">@i.Codigo</span> @i.Descricao <span class="badge bg-secondary ms-1" style="font-size:.65rem;">@i.Qtd reg.</span></td>
+                                    <td class="text-end">@C(i.Valor)</td>
+                                    <td class="text-end text-muted">-</td>
+                                </tr>
+                            }
+
+                            <!-- 2. DEDUÇÕES -->
+                            <tr class="dre-group bg-light">
+                                <td><span class="dre-num text-muted">2</span> <strong>(-) DEDUÇÕES</strong></td>
+                                <td class="text-end fw-bold text-danger">(@C(dre.Deducoes.Valor))</td>
+                                <td class="text-end text-muted">@Pct(dre.Deducoes.Margem)</td>
+                            </tr>
+                            @foreach (var i in dre.Deducoes.Itens)
+                            {
+                                <tr class="dre-item">
+                                    <td class="ps-4 text-muted"><span class="dre-num">@i.Codigo</span> @i.Descricao <span class="badge bg-secondary ms-1" style="font-size:.65rem;">@i.Qtd reg.</span></td>
+                                    <td class="text-end">(@C(i.Valor))</td>
+                                    <td class="text-end text-muted">-</td>
+                                </tr>
+                            }
+
+                            <!-- 3. RECEITA LÍQUIDA -->
+                            <tr class="dre-subtotal border-top border-2">
+                                <td><span class="dre-num text-muted">3</span> <strong>(=) RECEITA LÍQUIDA</strong></td>
+                                <td class="text-end fw-bold text-success">@C(dre.ReceitaLiquida.Valor)</td>
+                                <td class="text-end fw-bold">@Pct(dre.ReceitaLiquida.Margem)</td>
+                            </tr>
+
+                            <tr class="dre-spacer"><td colspan="3"></td></tr>
+
+                            <!-- 4. CUSTO DOS SERVIÇOS PRESTADOS -->
+                            <tr class="dre-group bg-light">
+                                <td><span class="dre-num text-muted">4</span> <strong>(-) CUSTO DOS SERVIÇOS PRESTADOS</strong></td>
+                                <td class="text-end fw-bold text-danger">(@C(dre.CustoServicos.Valor))</td>
+                                <td class="text-end text-muted">@Pct(dre.CustoServicos.Margem)</td>
+                            </tr>
+                            @foreach (var i in dre.CustoServicos.Itens)
+                            {
+                                <tr class="dre-item">
+                                    <td class="ps-4 text-muted"><span class="dre-num">@i.Codigo</span> @i.Descricao <span class="badge bg-secondary ms-1" style="font-size:.65rem;">@i.Qtd reg.</span></td>
+                                    <td class="text-end">(@C(i.Valor))</td>
+                                    <td class="text-end text-muted">-</td>
+                                </tr>
+                            }
+
+                            <!-- 5. LUCRO BRUTO -->
+                            <tr class="dre-subtotal border-top border-2">
+                                <td><span class="dre-num text-muted">5</span> <strong>(=) LUCRO BRUTO</strong></td>
+                                @{
+                                    var lbClass = dre.LucroBruto.Valor >= 0 ? "text-success" : "text-danger";
+                                    var lbFmt   = dre.LucroBruto.Valor >= 0 ? C(dre.LucroBruto.Valor) : $"({C(Math.Abs(dre.LucroBruto.Valor))})";
+                                }
+                                <td class="text-end fw-bold @lbClass">@lbFmt</td>
+                                <td class="text-end fw-bold">@Pct(dre.LucroBruto.Margem)</td>
+                            </tr>
+
+                            <tr class="dre-spacer"><td colspan="3"></td></tr>
+
+                            <!-- 6. DESPESAS OPERACIONAIS -->
+                            <tr class="dre-group bg-light">
+                                <td><span class="dre-num text-muted">6</span> <strong>(-) DESPESAS OPERACIONAIS</strong></td>
+                                <td class="text-end fw-bold text-danger">(@C(dre.DespesasOp.Valor))</td>
+                                <td class="text-end text-muted">@Pct(dre.DespesasOp.Margem)</td>
+                            </tr>
+                            @foreach (var i in dre.DespesasOp.Itens)
+                            {
+                                <tr class="dre-item">
+                                    <td class="ps-4 text-muted"><span class="dre-num">@i.Codigo</span> @i.Descricao <span class="badge bg-secondary ms-1" style="font-size:.65rem;">@i.Qtd reg.</span></td>
+                                    <td class="text-end">(@C(i.Valor))</td>
+                                    <td class="text-end text-muted">-</td>
+                                </tr>
+                            }
+
+                            <!-- 7. DESPESAS COM PESSOAL -->
+                            <tr class="dre-group bg-light">
+                                <td><span class="dre-num text-muted">7</span> <strong>(-) DESPESAS COM PESSOAL</strong></td>
+                                <td class="text-end fw-bold text-danger">(@C(dre.DespesasPessoal.Valor))</td>
+                                <td class="text-end text-muted">@Pct(dre.DespesasPessoal.Margem)</td>
+                            </tr>
+                            @foreach (var i in dre.DespesasPessoal.Itens)
+                            {
+                                <tr class="dre-item">
+                                    <td class="ps-4 text-muted"><span class="dre-num">@i.Codigo</span> @i.Descricao <span class="badge bg-secondary ms-1" style="font-size:.65rem;">@i.Qtd reg.</span></td>
+                                    <td class="text-end">(@C(i.Valor))</td>
+                                    <td class="text-end text-muted">-</td>
+                                </tr>
+                            }
+
+                            <!-- 8. RESULTADO OPERACIONAL -->
+                            <tr class="dre-subtotal border-top border-3 @(dre.ResultadoOp.Valor >= 0 ? "table-success" : "table-danger")">
+                                <td><span class="dre-num text-muted">8</span> <strong>(=) RESULTADO OPERACIONAL</strong></td>
+                                @{
+                                    var roClass = dre.ResultadoOp.Valor >= 0 ? "text-success" : "text-danger";
+                                    var roFmt   = dre.ResultadoOp.Valor >= 0 ? C(dre.ResultadoOp.Valor) : $"({C(Math.Abs(dre.ResultadoOp.Valor))})";
+                                }
+                                <td class="text-end fw-bold @roClass">@roFmt</td>
+                                <td class="text-end fw-bold">@Pct(dre.ResultadoOp.Margem)</td>
+                            </tr>
+
+                            <!-- Transferências (informativo) -->
+                            @if (dre.Transferencias.Valor > 0)
+                            {
+                            <tr class="dre-item table-warning">
+                                <td class="ps-3 text-muted fst-italic">
+                                    <i class="bi bi-arrow-left-right"></i>
+                                    <em>Transferências (informativo) — @dre.Transferencias.Qtd mov.</em>
+                                    <small class="d-block" style="font-size:.7rem;">@dre.Transferencias.Nota</small>
+                                </td>
+                                <td class="text-end text-muted fst-italic">@C(dre.Transferencias.Valor)</td>
+                                <td class="text-end text-muted fst-italic">—</td>
+                            </tr>
+                            }
+
+                            <tr class="dre-spacer"><td colspan="3"></td></tr>
+
+                            <!-- 9. RESULTADO LÍQUIDO -->
+                            <tr class="dre-total border-top border-3 @(superavit ? "table-success" : "table-danger")">
+                                <td>
+                                    <span class="dre-num text-muted">9</span>
+                                    <strong class="fs-6">(=) RESULTADO LÍQUIDO</strong>
+                                    <span class="badge @(superavit ? "bg-success" : "bg-danger") ms-2">
+                                        <i class="bi @(superavit ? "bi-graph-up-arrow" : "bi-graph-down-arrow")"></i>
+                                        @dre.ResultadoLiquido.Label
+                                    </span>
+                                </td>
+                                @{
+                                    var rlFmt = superavit ? C(dre.ResultadoLiquido.Valor) : $"({C(Math.Abs(dre.ResultadoLiquido.Valor))})";
+                                }
+                                <td class="text-end fw-bold fs-5 @resClass">@rlFmt</td>
+                                <td class="text-end fw-bold fs-6">@Pct(dre.ResultadoLiquido.Margem)</td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Painel Lateral ────────────────────────── -->
+        <div class="col-lg-4">
+
+            <!-- KPI Cards -->
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <div class="card border-0 bg-success text-white kpi-mini">
+                        <div class="card-body py-2 px-3">
+                            <div class="small fw-bold opacity-75">RECEITA BRUTA</div>
+                            <div class="fw-bold">@C(dre.ReceitaBruta.Valor)</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card border-0 bg-danger text-white kpi-mini">
+                        <div class="card-body py-2 px-3">
+                            <div class="small fw-bold opacity-75">TOTAL DESPESAS</div>
+                            <div class="fw-bold">@C(dre.DespesasOp.Valor + dre.DespesasPessoal.Valor + dre.CustoServicos.Valor)</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card border-0 bg-info text-white kpi-mini">
+                        <div class="card-body py-2 px-3">
+                            <div class="small fw-bold opacity-75">LUCRO BRUTO</div>
+                            <div class="fw-bold">@C(dre.LucroBruto.Valor)</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card border-0 @(superavit ? "bg-success" : "bg-danger") text-white kpi-mini">
+                        <div class="card-body py-2 px-3">
+                            <div class="small fw-bold opacity-75">RESULTADO</div>
+                            <div class="fw-bold">@C(dre.ResultadoLiquido.Valor)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Composição Despesas -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header py-2">
+                    <strong class="small"><i class="bi bi-pie-chart text-danger"></i> Composição de Custos e Despesas</strong>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            @{
+                                var totalDesp = dre.CustoServicos.Valor + dre.DespesasOp.Valor + dre.DespesasPessoal.Valor;
+                            }
+                            <tr>
+                                <td class="ps-3"><span class="badge bg-primary me-1">CSP</span> Custo dos Serviços</td>
+                                <td class="text-end pe-3">@C(dre.CustoServicos.Valor)</td>
+                            </tr>
+                            <tr>
+                                <td class="ps-3"><span class="badge bg-warning text-dark me-1">PAG</span> Despesas Operacionais</td>
+                                <td class="text-end pe-3">@C(dre.DespesasOp.Valor)</td>
+                            </tr>
+                            <tr>
+                                <td class="ps-3"><span class="badge bg-purple me-1">FOPAG</span> Pessoal (líquido)</td>
+                                <td class="text-end pe-3">@C(dre.DespesasPessoal.Valor)</td>
+                            </tr>
+                            <tr class="table-light fw-bold">
+                                <td class="ps-3">Total</td>
+                                <td class="text-end pe-3 text-danger">@C(totalDesp)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Margens -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header py-2">
+                    <strong class="small"><i class="bi bi-percent text-primary"></i> Margens</strong>
+                </div>
+                <div class="card-body py-2">
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small">
+                            <span>Margem Bruta</span>
+                            <span class="fw-bold">@Pct(dre.LucroBruto.Margem)</span>
+                        </div>
+                        <div class="progress" style="height:8px;">
+                            <div class="progress-bar bg-info" style="width:@Math.Max(0,dre.LucroBruto.Margem).ToString("F0")%"></div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small">
+                            <span>Margem Operacional</span>
+                            <span class="fw-bold @(dre.ResultadoOp.Margem >= 0 ? "text-success" : "text-danger")">@Pct(dre.ResultadoOp.Margem)</span>
+                        </div>
+                        <div class="progress" style="height:8px;">
+                            <div class="progress-bar @(dre.ResultadoOp.Margem >= 0 ? "bg-success" : "bg-danger")"
+                                 style="width:@Math.Max(0,dre.ResultadoOp.Margem).ToString("F0")%"></div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small">
+                            <span>Margem Líquida</span>
+                            <span class="fw-bold @(dre.ResultadoLiquido.Margem >= 0 ? "text-success" : "text-danger")">@Pct(dre.ResultadoLiquido.Margem)</span>
+                        </div>
+                        <div class="progress" style="height:8px;">
+                            <div class="progress-bar @(dre.ResultadoLiquido.Margem >= 0 ? "bg-success" : "bg-danger")"
+                                 style="width:@Math.Max(0,dre.ResultadoLiquido.Margem).ToString("F0")%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /col-lg-4 -->
+    </div>
+
+    <!-- ── Folha de Pagamento Detalhada ──────────────── -->
+    @if (dre.FuncionarioDetalhe.Any())
+    {
+    <div class="card border-0 shadow-sm mt-3">
+        <div class="card-header py-2">
+            <strong class="small">
+                <i class="bi bi-people text-primary"></i>
+                Folha de Pagamento — @dre.FuncionarioDetalhe.Count funcionário(s) · @dre.CompetenceDisplay
+            </strong>
+        </div>
+        <div class="card-body p-0">
+            <div style="max-height:320px;overflow-y:auto;">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th>Matrícula</th>
+                        <th>Funcionário</th>
+                        <th>Cargo</th>
+                        <th class="text-end">Bruto</th>
+                        <th class="text-end">Descontos</th>
+                        <th class="text-end">Líquido</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var f in dre.FuncionarioDetalhe)
+                    {
+                        <tr>
+                            <td class="text-muted small">@f.Matricula</td>
+                            <td>@f.Funcionario</td>
+                            <td class="text-muted small">@f.Cargo</td>
+                            <td class="text-end">@C(f.ValorBruto)</td>
+                            <td class="text-end text-danger small">(@C(f.Descontos))</td>
+                            <td class="text-end fw-bold text-success">@C(f.ValorLiquido)</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot class="table-secondary fw-bold">
+                    <tr>
+                        <td colspan="3">TOTAL</td>
+                        <td class="text-end">@C(dre.FuncionarioDetalhe.Sum(f => f.ValorBruto))</td>
+                        <td class="text-end text-danger">(@C(dre.FuncionarioDetalhe.Sum(f => f.Descontos)))</td>
+                        <td class="text-end text-success">@C(dre.FuncionarioDetalhe.Sum(f => f.ValorLiquido))</td>
+                    </tr>
+                </tfoot>
+            </table>
+            </div>
+        </div>
+    </div>
+    }
+
+    }<!-- /if Dre != null -->
+</div>
+}
+
+<style>
+.dre-table td, .dre-table th { padding: .45rem .75rem; }
+.dre-group td             { font-size: .9rem; }
+.dre-item td              { font-size: .82rem; background: #fafafa; }
+.dre-subtotal td          { font-size: .92rem; background: #f0f4f8; }
+.dre-total td             { font-size: 1rem; }
+.dre-spacer td            { height: 6px; padding: 0; }
+.dre-num                  { display: inline-block; min-width: 1.8rem; font-size: .75rem; }
+.kpi-mini .card-body      { padding: .4rem .75rem; }
+.kpi-mini .fw-bold        { font-size: .95rem; }
+.bg-purple                { background-color: #6f42c1; color: #fff; }
+</style>

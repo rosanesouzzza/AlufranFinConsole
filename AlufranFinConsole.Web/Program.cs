@@ -4,8 +4,15 @@ using AlufranFinConsole.Application.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddRazorPages();
 builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("ApiClient", client =>
+{
+    client.BaseAddress = new Uri("http://localhost:5001");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddCors(options =>
@@ -45,6 +52,7 @@ app.UseSession();
 app.UseRouting();
 app.UseCors("AllowAll");
 
+app.MapRazorPages();
 app.MapControllers();
 
 using (var scope = app.Services.CreateScope())

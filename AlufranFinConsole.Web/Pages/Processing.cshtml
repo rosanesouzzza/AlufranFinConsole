@@ -1,0 +1,369 @@
+@page
+@model ProcessingModel
+@{
+    ViewData["Title"] = "Processamento & Fechamento";
+}
+
+<div class="container-fluid mt-4">
+    <h1>⚙️ Processamento & Fechamento Mensal</h1>
+    <hr />
+
+    @if (!Model.IsAuthenticated)
+    {
+        <div class="card col-md-4 mx-auto mt-5">
+            <div class="card-header bg-primary text-white"><h5 class="mb-0">🔐 Login Necessário</h5></div>
+            <div class="card-body">
+                @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                {
+                    <div class="alert alert-danger">@Model.ErrorMessage</div>
+                }
+                <form method="post" asp-page-handler="Login">
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" asp-for="LoginEmail" class="form-control" placeholder="admin@alufran.local" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Senha</label>
+                        <input type="password" asp-for="LoginPassword" class="form-control" />
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Entrar</button>
+                </form>
+            </div>
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show">
+                @Model.SuccessMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show">
+                @Model.ErrorMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        <!-- Seletor de competência -->
+        <div class="card mb-4">
+            <div class="card-body py-2">
+                <form method="post" asp-page-handler="SelectCompetence" class="row g-2 align-items-center">
+                    <div class="col-auto">
+                        <label class="col-form-label fw-bold">📅 Competência:</label>
+                    </div>
+                    <div class="col-auto">
+                        <input type="month" asp-for="SelectedCompetence" class="form-control" />
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-arrow-clockwise"></i> Atualizar
+                        </button>
+                    </div>
+                    <div class="col-auto text-muted small">
+                        Exibindo dados de <strong>@Model.SelectedCompetence</strong>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="row">
+
+            <!-- ── COLUNA ESQUERDA: Arquivos ── -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header bg-dark text-white">
+                        <h6 class="mb-0">📂 Arquivos de Importação</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        @if (Model.ImportFiles != null && Model.ImportFiles.Any())
+                        {
+                            <div class="list-group list-group-flush">
+                                @foreach (var f in Model.ImportFiles.OrderByDescending(x => x.CreatedAt))
+                                {
+                                    var badgeClass = f.Status switch {
+                                        "COMPLETED" => "bg-success",
+                                        "COMPLETED_WITH_ERRORS" => "bg-warning text-dark",
+                                        "PENDING"   => "bg-secondary",
+                                        _           => "bg-secondary"
+                                    };
+                                    var statusLabel = f.Status switch {
+                                        "COMPLETED" => "Concluído",
+                                        "COMPLETED_WITH_ERRORS" => "Parcial",
+                                        "PENDING"   => "Pendente",
+                                        "PROCESSING" => "Aguardando",
+                                        _           => f.Status
+                                    };
+                                    var canProcess = f.Status != "COMPLETED" && f.Status != "COMPLETED_WITH_ERRORS";
+                                    var canCancel  = f.Status is "COMPLETED" or "COMPLETED_WITH_ERRORS";
+
+                                    <div class="list-group-item p-2">
+                                        <div class="d-flex justify-content-between align-items-start mb-1">
+                                            <div>
+                                                <span class="badge bg-info me-1">@f.FileType</span>
+                                                <span class="badge @badgeClass">@statusLabel</span>
+                                                <small class="text-muted ms-1">@f.Competence</small>
+                                            </div>
+                                            <small class="text-muted">#@f.Id</small>
+                                        </div>
+                                        <small class="d-block text-truncate text-muted mb-2" title="@f.FileName">@f.FileName</small>
+                                        <div class="d-flex gap-1">
+                                            @if (canProcess)
+                                            {
+                                                <form method="post" asp-page-handler="Process" class="d-inline">
+                                                    <input type="hidden" name="importFileId" value="@f.Id" />
+                                                    <input type="hidden" asp-for="SelectedCompetence" />
+                                                    <button type="submit" class="btn btn-sm btn-success"
+                                                            onclick="return confirm('Processar arquivo @f.FileName?')">
+                                                        <i class="bi bi-play-fill"></i> Processar
+                                                    </button>
+                                                </form>
+                                            }
+                                            @if (canCancel)
+                                            {
+                                                <form method="post" asp-page-handler="Cancel" class="d-inline">
+                                                    <input type="hidden" name="importFileId" value="@f.Id" />
+                                                    <input type="hidden" asp-for="SelectedCompetence" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                            onclick="return confirm('Cancelar processamento de @f.FileName? As transações serão removidas.')">
+                                                        <i class="bi bi-arrow-counterclockwise"></i> Cancelar
+                                                    </button>
+                                                </form>
+                                            }
+                                            <a href="/Staging" class="btn btn-sm btn-outline-secondary">
+                                                <i class="bi bi-clipboard-check"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-4">
+                                <i class="bi bi-inbox display-6"></i>
+                                <p class="mt-2 small">Nenhum arquivo encontrado.<br/>
+                                   <a href="/Upload">Fazer upload</a></p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── COLUNA DIREITA: Fechamento ── -->
+            <div class="col-md-8">
+
+                @if (Model.Summary != null)
+                {
+                    <!-- Cards de resumo -->
+                    <div class="row g-3 mb-4">
+
+                        <div class="col-6 col-xl-3">
+                            <div class="card text-center border-success">
+                                <div class="card-body py-3">
+                                    <div class="text-success small fw-bold mb-1">
+                                        <i class="bi bi-arrow-down-circle"></i> RECEITAS
+                                    </div>
+                                    <div class="fs-5 fw-bold text-success">
+                                        @Model.Summary.TotalReceitas.ToString("C", new System.Globalization.CultureInfo("pt-BR"))
+                                    </div>
+                                    <small class="text-muted">
+                                        @Model.Summary.DetalhesReceitas.Count tipo(s)
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-6 col-xl-3">
+                            <div class="card text-center border-danger">
+                                <div class="card-body py-3">
+                                    <div class="text-danger small fw-bold mb-1">
+                                        <i class="bi bi-arrow-up-circle"></i> DESPESAS
+                                    </div>
+                                    <div class="fs-5 fw-bold text-danger">
+                                        @Model.Summary.TotalDespesas.ToString("C", new System.Globalization.CultureInfo("pt-BR"))
+                                    </div>
+                                    <small class="text-muted">
+                                        @Model.Summary.DetalhesDespesas.Count tipo(s)
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (Model.Summary.Funcionarios > 0)
+                        {
+                            <div class="col-6 col-xl-3">
+                                <div class="card text-center border-warning">
+                                    <div class="card-body py-3">
+                                        <div class="text-warning small fw-bold mb-1">
+                                            <i class="bi bi-people"></i> FOLHA
+                                        </div>
+                                        <div class="fs-5 fw-bold text-warning">
+                                            @Model.Summary.TotalFolhaLiquido.ToString("C", new System.Globalization.CultureInfo("pt-BR"))
+                                        </div>
+                                        <small class="text-muted">@Model.Summary.Funcionarios funcionário(s)</small>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="col-6 col-xl-3">
+                            @{
+                                var resultClass = Model.Summary.Resultado >= 0 ? "border-success" : "border-danger";
+                                var resultTextClass = Model.Summary.Resultado >= 0 ? "text-success" : "text-danger";
+                                var resultIcon = Model.Summary.Resultado >= 0 ? "bi-graph-up-arrow" : "bi-graph-down-arrow";
+                            }
+                            <div class="card text-center @resultClass">
+                                <div class="card-body py-3">
+                                    <div class="@resultTextClass small fw-bold mb-1">
+                                        <i class="bi @resultIcon"></i> RESULTADO
+                                    </div>
+                                    <div class="fs-5 fw-bold @resultTextClass">
+                                        @Model.Summary.Resultado.ToString("C", new System.Globalization.CultureInfo("pt-BR"))
+                                    </div>
+                                    <small class="text-muted">@Model.Summary.ResultadoLabel</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detalhamento por tipo -->
+                    <div class="row g-3 mb-4">
+                        @if (Model.Summary.DetalhesReceitas.Any())
+                        {
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-success text-white py-2">
+                                        <small class="fw-bold">Detalhamento de Receitas</small>
+                                    </div>
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            @foreach (var d in Model.Summary.DetalhesReceitas)
+                                            {
+                                                <tr>
+                                                    <td><span class="badge bg-info">@d.Tipo</span></td>
+                                                    <td class="text-end">@d.Count lançamentos</td>
+                                                    <td class="text-end fw-bold text-success">
+                                                        @d.Total.ToString("C", new System.Globalization.CultureInfo("pt-BR"))
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        }
+                        @if (Model.Summary.DetalhesDespesas.Any())
+                        {
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-danger text-white py-2">
+                                        <small class="fw-bold">Detalhamento de Despesas</small>
+                                    </div>
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            @foreach (var d in Model.Summary.DetalhesDespesas)
+                                            {
+                                                <tr>
+                                                    <td><span class="badge bg-info">@d.Tipo</span></td>
+                                                    <td class="text-end">@d.Count lançamentos</td>
+                                                    <td class="text-end fw-bold text-danger">
+                                                        @d.Total.ToString("C", new System.Globalization.CultureInfo("pt-BR"))
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        }
+                        @if (!Model.Summary.DetalhesReceitas.Any() && !Model.Summary.DetalhesDespesas.Any())
+                        {
+                            <div class="col-12">
+                                <div class="alert alert-info mb-0">
+                                    <i class="bi bi-info-circle"></i>
+                                    Nenhuma transação processada para <strong>@Model.SelectedCompetence</strong>.
+                                    Selecione um arquivo e clique em <strong>Processar</strong>.
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        Selecione uma competência e processe um arquivo para ver o resumo.
+                    </div>
+                }
+
+                <!-- Tabela de transações -->
+                @if (Model.Transactions != null && Model.Transactions.Any())
+                {
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">
+                                📋 Transações — @Model.SelectedCompetence
+                                <span class="badge bg-secondary ms-1">@Model.Transactions.Count</span>
+                            </h6>
+                            <small class="text-muted">
+                                Total: <strong>@Model.Transactions.Sum(t => t.Valor).ToString("C", new System.Globalization.CultureInfo("pt-BR"))</strong>
+                            </small>
+                        </div>
+                        <div class="table-responsive" style="max-height:400px;overflow-y:auto;">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>Tipo</th>
+                                        <th>Documento</th>
+                                        <th>Contraparte</th>
+                                        <th>Categoria</th>
+                                        <th class="text-end">Valor</th>
+                                        <th>Data</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var t in Model.Transactions)
+                                    {
+                                        var typeClass = t.TransactionType switch {
+                                            "REC" or "FAT"    => "bg-success",
+                                            "PAG" or "COMP"   => "bg-danger",
+                                            "FOPAG"           => "bg-warning text-dark",
+                                            "TRANSF"          => "bg-info",
+                                            "EMITIDAS"        => "bg-primary",
+                                            _                 => "bg-secondary"
+                                        };
+                                        var valorClass = t.TransactionType switch {
+                                            "REC" or "FAT"    => "text-success",
+                                            "PAG" or "COMP"   => "text-danger",
+                                            _                 => ""
+                                        };
+                                        <tr>
+                                            <td><span class="badge @typeClass">@t.TransactionType</span></td>
+                                            <td><code class="small">@t.Documento</code></td>
+                                            <td><small class="text-truncate d-inline-block" style="max-width:180px" title="@t.Counterpart">@t.Counterpart</small></td>
+                                            <td><small class="text-muted">@t.Categoria</small></td>
+                                            <td class="text-end fw-bold @valorClass">
+                                                @t.Valor.ToString("C", new System.Globalization.CultureInfo("pt-BR"))
+                                            </td>
+                                            <td><small>@t.DataTransacao.ToString("dd/MM/yyyy")</small></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+.card { box-shadow: 0 2px 6px rgba(0,0,0,.08); border: 1px solid rgba(0,0,0,.1); margin-bottom: 1rem; }
+.list-group-item { border-left: 0; border-right: 0; }
+.sticky-top { z-index: 1; }
+</style>

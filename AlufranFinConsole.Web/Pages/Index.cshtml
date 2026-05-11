@@ -1,10 +1,343 @@
-﻿@page
+@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Dashboard";
+    var ptBR = new System.Globalization.CultureInfo("pt-BR");
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+@if (!Model.IsAuthenticated)
+{
+    <div class="text-center mt-5 py-5">
+        <i class="bi bi-bar-chart-line display-1 text-primary"></i>
+        <h1 class="mt-3">AlufranFinConsole</h1>
+        <p class="lead text-muted">Plataforma de Fechamento Financeiro Governado</p>
+        <a href="/Staging" class="btn btn-primary btn-lg mt-2">
+            <i class="bi bi-box-arrow-in-right"></i> Fazer Login
+        </a>
+    </div>
+}
+else
+{
+<div class="container-fluid mt-3">
+
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="mb-0">
+                <i class="bi bi-speedometer2 text-primary"></i> Dashboard
+            </h1>
+            <small class="text-muted">Visão geral do fechamento financeiro · Atualizado em @DateTime.Now.ToString("dd/MM/yyyy HH:mm")</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/Upload" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-cloud-upload"></i> Upload
+            </a>
+            <a href="/Staging" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-clipboard-check"></i> Staging
+            </a>
+            <a href="/Processing" class="btn btn-outline-success btn-sm">
+                <i class="bi bi-bar-chart-line"></i> Processamento
+            </a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-warning">@Model.ErrorMessage</div>
+    }
+
+    <!-- ── KPIs globais ── -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card kpi-card border-0 bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="kpi-label">COMPETÊNCIAS</div>
+                            <div class="kpi-value">@Model.Kpis.TotalCompetencias</div>
+                        </div>
+                        <i class="bi bi-calendar3 kpi-icon"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card kpi-card border-0 bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="kpi-label">RECEITAS TOTAIS</div>
+                            <div class="kpi-value">@Model.Kpis.TotalReceitas.ToString("C", ptBR)</div>
+                        </div>
+                        <i class="bi bi-arrow-down-circle kpi-icon"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card kpi-card border-0 bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="kpi-label">DESPESAS TOTAIS</div>
+                            <div class="kpi-value">@Model.Kpis.TotalDespesas.ToString("C", ptBR)</div>
+                        </div>
+                        <i class="bi bi-arrow-up-circle kpi-icon"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            @{
+                var resClass = Model.Kpis.Resultado >= 0 ? "bg-success" : "bg-danger";
+                var resIcon  = Model.Kpis.Resultado >= 0 ? "bi-graph-up-arrow" : "bi-graph-down-arrow";
+            }
+            <div class="card kpi-card border-0 @resClass text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="kpi-label">RESULTADO ACUMULADO</div>
+                            <div class="kpi-value">@Model.Kpis.Resultado.ToString("C", ptBR)</div>
+                        </div>
+                        <i class="bi @resIcon kpi-icon"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Barra de progresso do pipeline ── -->
+    @{
+        var pct = Model.Kpis.TotalArquivos > 0
+            ? (double)Model.Kpis.ArquivosConcluidos / Model.Kpis.TotalArquivos * 100
+            : 0;
+    }
+    <div class="card mb-4 border-0">
+        <div class="card-body py-3">
+            <div class="d-flex justify-content-between mb-1">
+                <span class="fw-bold small">
+                    <i class="bi bi-activity text-primary"></i> Progresso do Pipeline
+                </span>
+                <span class="small text-muted">
+                    @Model.Kpis.ArquivosConcluidos de @Model.Kpis.TotalArquivos arquivo(s) concluídos
+                    @if (Model.Kpis.ArquivosPendentes > 0)
+                    {
+                        <span class="badge bg-warning text-dark ms-2">
+                            @Model.Kpis.ArquivosPendentes pendente(s)
+                        </span>
+                    }
+                </span>
+            </div>
+            <div class="progress" style="height:12px;">
+                <div class="progress-bar bg-success progress-bar-striped"
+                     role="progressbar" style="width:@pct.ToString("F0")%">
+                    @pct.ToString("F0")%
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- ── Cards por competência ── -->
+        <div class="col-lg-8">
+            <h5 class="mb-3"><i class="bi bi-calendar-range text-primary"></i> Fechamento por Competência</h5>
+
+            @if (!Model.CompetenceCards.Any())
+            {
+                <div class="card border-0 text-center py-5">
+                    <div class="card-body text-muted">
+                        <i class="bi bi-inbox display-4"></i>
+                        <p class="mt-3">Nenhuma competência processada ainda.</p>
+                        <a href="/Upload" class="btn btn-primary">
+                            <i class="bi bi-cloud-upload"></i> Carregar primeiro arquivo
+                        </a>
+                    </div>
+                </div>
+            }
+            else
+            {
+                @foreach (var card in Model.CompetenceCards)
+                {
+                    var rLabel  = card.ResultadoLabel == "SUPERÁVIT" ? "text-success" : "text-danger";
+                    var rBorder = card.ResultadoLabel == "SUPERÁVIT" ? "border-start border-success border-4" : "border-start border-danger border-4";
+                    var pipeline = card.TotalArquivos > 0
+                        ? (double)card.ArquivosConcluidos / card.TotalArquivos * 100 : 0;
+
+                    <div class="card mb-3 border-0 @rBorder shadow-sm">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+
+                                <!-- Competência -->
+                                <div class="col-md-2 text-center border-end">
+                                    <div class="fw-bold text-uppercase small text-muted">Competência</div>
+                                    <div class="fs-5 fw-bold">@card.CompetenceDisplay</div>
+                                    <div class="small text-muted mt-1">
+                                        <i class="bi bi-files"></i> @card.TotalArquivos arquivo(s)
+                                    </div>
+                                </div>
+
+                                <!-- Receitas / Despesas / Resultado -->
+                                <div class="col-md-6">
+                                    <div class="row text-center">
+                                        <div class="col-4">
+                                            <div class="small text-muted">Receitas</div>
+                                            <div class="fw-bold text-success">
+                                                @card.TotalReceitas.ToString("C", ptBR)
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="small text-muted">Despesas</div>
+                                            <div class="fw-bold text-danger">
+                                                @card.TotalDespesas.ToString("C", ptBR)
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="small text-muted">Resultado</div>
+                                            <div class="fw-bold @rLabel">
+                                                @card.Resultado.ToString("C", ptBR)
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Mini barra de pipeline -->
+                                    <div class="progress mt-2" style="height:6px;" title="@card.ArquivosConcluidos de @card.TotalArquivos processados">
+                                        <div class="progress-bar bg-success" style="width:@pipeline.ToString("F0")%"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">Pipeline: @card.ArquivosConcluidos/@card.TotalArquivos concluídos</small>
+                                        @if (card.Funcionarios > 0)
+                                        {
+                                            <small class="text-muted"><i class="bi bi-people"></i> @card.Funcionarios func.</small>
+                                        }
+                                    </div>
+                                </div>
+
+                                <!-- Label + Ações -->
+                                <div class="col-md-4 text-center">
+                                    <div class="mb-2">
+                                        @if (card.ResultadoLabel == "SUPERÁVIT")
+                                        {
+                                            <span class="badge bg-success fs-6 px-3 py-2">
+                                                <i class="bi bi-graph-up-arrow"></i> SUPERÁVIT
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger fs-6 px-3 py-2">
+                                                <i class="bi bi-graph-down-arrow"></i> DÉFICIT
+                                            </span>
+                                        }
+                                    </div>
+                                    @if (card.IsAprovado)
+                                    {
+                                        <div class="mb-2">
+                                            <span class="badge bg-success border border-success" style="font-size:.72rem;"
+                                                  title="Aprovado por @card.ApprovedBy em @card.ApprovedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")">
+                                                <i class="bi bi-patch-check-fill"></i> APROVADO
+                                            </span>
+                                        </div>
+                                    }
+                                    <div class="d-flex gap-1 justify-content-center">
+                                        <a href="/Processing?competence=@card.Competence"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-zoom-in"></i> Detalhes
+                                        </a>
+                                        <a href="/Dre?competence=@card.Competence"
+                                           class="btn btn-sm btn-outline-success">
+                                            <i class="bi bi-file-earmark-bar-graph"></i> DRE
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- ── Pipeline de arquivos ── -->
+        <div class="col-lg-4">
+            <h5 class="mb-3"><i class="bi bi-kanban text-primary"></i> Status dos Arquivos</h5>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    @if (!Model.PipelineFiles.Any())
+                    {
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-inbox"></i> Nenhum arquivo
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="list-group list-group-flush" style="max-height:520px;overflow-y:auto;">
+                            @foreach (var f in Model.PipelineFiles)
+                            {
+                                var stClass = f.Status switch {
+                                    "COMPLETED"              => "bg-success",
+                                    "COMPLETED_WITH_ERRORS"  => "bg-warning text-dark",
+                                    "PENDING"                => "bg-secondary",
+                                    "PROCESSING"             => "bg-info",
+                                    _                        => "bg-secondary"
+                                };
+                                var stLabel = f.Status switch {
+                                    "COMPLETED"              => "✓ Concluído",
+                                    "COMPLETED_WITH_ERRORS"  => "⚠ Parcial",
+                                    "PENDING"                => "⏳ Pendente",
+                                    "PROCESSING"             => "⚙ Processando",
+                                    _                        => f.Status
+                                };
+                                var typeColor = f.FileType switch {
+                                    "PAG"     => "bg-danger",
+                                    "REC"     => "bg-success",
+                                    "FAT"     => "bg-primary",
+                                    "EMITIDAS"=> "bg-dark",
+                                    "COMP"    => "bg-warning text-dark",
+                                    "TRANSF"  => "bg-info",
+                                    "FOPAG"   => "bg-purple",
+                                    _         => "bg-secondary"
+                                };
+                                <div class="list-group-item py-2 px-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge @typeColor" style="min-width:60px;text-align:center;">@f.FileType</span>
+                                            <div>
+                                                <div class="small fw-semibold text-truncate" style="max-width:160px;" title="@f.FileName">
+                                                    @f.FileName
+                                                </div>
+                                                <div class="text-muted" style="font-size:0.72rem;">
+                                                    @f.Competence · #@f.Id
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <span class="badge @stClass" style="font-size:0.7rem;">@stLabel</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="card-footer bg-transparent py-2 text-center">
+                    <a href="/Upload" class="btn btn-sm btn-outline-primary me-1">
+                        <i class="bi bi-plus-circle"></i> Novo arquivo
+                    </a>
+                    <a href="/Processing" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-play-circle"></i> Processar
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    </div>
 </div>
+}
+
+<style>
+.kpi-card         { border-radius: 12px; }
+.kpi-card .card-body { padding: 1.25rem; }
+.kpi-label        { font-size: .7rem; font-weight: 700; letter-spacing: .08em; opacity: .85; }
+.kpi-value        { font-size: 1.35rem; font-weight: 700; margin-top: .15rem; }
+.kpi-icon         { font-size: 2rem; opacity: .3; }
+.card             { box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+.border-start.border-success { border-left-color: #198754 !important; }
+.border-start.border-danger  { border-left-color: #dc3545 !important; }
+.bg-purple        { background-color: #6f42c1; color: #fff; }
+</style>

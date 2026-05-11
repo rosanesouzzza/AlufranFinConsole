@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AlufranFinConsole.Domain\AlufranFinConsole.Domain.csproj" />
+    <ProjectReference Include="..\AlufranFinConsole.Application\AlufranFinConsole.Application.csproj" />
   </ItemGroup>
 
 </Project>
